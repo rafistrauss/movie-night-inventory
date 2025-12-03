@@ -5,6 +5,12 @@ export default defineConfig({
   plugins: [svelte()],
   base: '/movie-night-inventory/',
   build: {
-    outDir: 'dist'
-  }
+    outDir: 'dist',
+    rollupOptions: {
+      input: {
+        main: './index.html'
+      }
+    }
+  },
+  publicDir: 'public'
 });
