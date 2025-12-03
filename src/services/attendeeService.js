@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { invalidateCache } from './aggregationService';
+import { dataCache } from './cacheService';
 
 export async function addAttendee(eventId, attendeeData) {
   const attendeesRef = collection(db, 'events', eventId, 'attendees');
@@ -16,6 +17,9 @@ export async function addAttendee(eventId, attendeeData) {
     ...attendeeData,
     checkedIn: attendeeData.checkedIn || false
   });
+  
+  // Invalidate attendees cache for this event
+  dataCache.invalidate(`attendees_${eventId}`);
   invalidateCache();
   return docRef.id;
 }
@@ -45,6 +49,9 @@ export async function bulkAddAttendees(eventId, attendeesData) {
   }
 
   await batch.commit();
+  
+  // Invalidate attendees cache for this event
+  dataCache.invalidate(`attendees_${eventId}`);
   invalidateCache();
   
   return newDocRefs.map(ref => ref.id);
@@ -53,22 +60,35 @@ export async function bulkAddAttendees(eventId, attendeesData) {
 export async function updateAttendee(eventId, attendeeId, attendeeData) {
   const attendeeRef = doc(db, 'events', eventId, 'attendees', attendeeId);
   await updateDoc(attendeeRef, attendeeData);
+  
+  // Invalidate attendees cache for this event
+  dataCache.invalidate(`attendees_${eventId}`);
   invalidateCache();
 }
 
 export async function deleteAttendee(eventId, attendeeId) {
   const attendeeRef = doc(db, 'events', eventId, 'attendees', attendeeId);
   await deleteDoc(attendeeRef);
+  
+  // Invalidate attendees cache for this event
+  dataCache.invalidate(`attendees_${eventId}`);
   invalidateCache();
 }
 
 export async function getAttendees(eventId) {
+  const cacheKey = `attendees_${eventId}`;
+  const cached = dataCache.get(cacheKey);
+  if (cached) return cached;
+  
   const attendeesRef = collection(db, 'events', eventId, 'attendees');
   const snapshot = await getDocs(attendeesRef);
-  return snapshot.docs.map(doc => ({
+  const attendees = snapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data()
   }));
+  
+  dataCache.set(cacheKey, attendees);
+  return attendees;
 }
 
 export async function getTotalCollected(eventId) {

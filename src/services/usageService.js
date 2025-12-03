@@ -9,10 +9,15 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { invalidateCache } from './aggregationService';
+import { dataCache } from './cacheService';
 
 export async function addUsage(eventId, usageData) {
   const usageRef = collection(db, 'events', eventId, 'usage');
   const docRef = await addDoc(usageRef, usageData);
+  
+  // Invalidate usage caches
+  dataCache.invalidate(`usage_${eventId}`);
+  dataCache.invalidate('all_usage');
   invalidateCache();
   return docRef.id;
 }
@@ -39,18 +44,29 @@ export async function bulkAddUsage(eventId, usageDataArray) {
   }
 
   await batch.commit();
+  
+  // Invalidate usage caches
+  dataCache.invalidate(`usage_${eventId}`);
+  dataCache.invalidate('all_usage');
   invalidateCache();
   
   return newDocRefs.map(ref => ref.id);
 }
 
 export async function getUsageByEvent(eventId) {
+  const cacheKey = `usage_${eventId}`;
+  const cached = dataCache.get(cacheKey);
+  if (cached) return cached;
+  
   const usageRef = collection(db, 'events', eventId, 'usage');
   const snapshot = await getDocs(usageRef);
-  return snapshot.docs.map(doc => ({
+  const usage = snapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data()
   }));
+  
+  dataCache.set(cacheKey, usage);
+  return usage;
 }
 
 export async function getUsageByItem(itemName) {
@@ -62,6 +78,10 @@ export async function getUsageByItem(itemName) {
 }
 
 export async function getAllUsage() {
+  const cacheKey = 'all_usage';
+  const cached = dataCache.get(cacheKey);
+  if (cached) return cached;
+  
   const events = await getDocs(collection(db, 'events'));
   const allUsage = [];
   
@@ -78,5 +98,6 @@ export async function getAllUsage() {
     });
   }
   
+  dataCache.set(cacheKey, allUsage);
   return allUsage;
 }
