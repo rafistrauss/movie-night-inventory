@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Events collection
+    match /events/{eventId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+      
+      // Attendees subcollection
+      match /attendees/{attendeeId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+      
+      // Usage subcollection
+      match /usage/{usageId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+    }
+    
+    // Expenses collection
+    match /expenses/{expenseId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    // Inventory collection (if used for caching)
+    match /inventory/{inventoryId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+  }
+}

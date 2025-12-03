@@ -1,0 +1,21 @@
+{
+  "name": "movie-night-inventory",
+  "version": "1.0.0",
+  "description": "Movie Night Budget and Inventory Tracker",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "oxlint src"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^3.0.1",
+    "oxlint": "^0.12.0",
+    "svelte": "^4.2.8",
+    "vite": "^5.0.11"
+  },
+  "dependencies": {
+    "firebase": "^10.7.2"
+  }
+}

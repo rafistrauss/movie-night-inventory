@@ -1,0 +1,287 @@
+<script>
+  import { onMount } from 'svelte';
+  import { createEventDispatcher } from 'svelte';
+  import { getDashboardData } from '../services/aggregationService';
+  
+  const dispatch = createEventDispatcher();
+  
+  let events = [];
+  let leftoverFunds = 0;
+  let inventory = [];
+  let lowStockItems = 0;
+  let loading = true;
+  
+  onMount(async () => {
+    await loadData();
+  });
+  
+  async function loadData() {
+    try {
+      loading = true;
+      // Single optimized fetch instead of 3 separate calls
+      const data = await getDashboardData();
+      events = data.events;
+      leftoverFunds = data.leftoverFunds;
+      inventory = data.inventory;
+      lowStockItems = data.lowStockItems;
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      loading = false;
+    }
+  }
+  
+  function viewEvent(eventId) {
+    dispatch('navigate', { view: 'eventDetails', eventId });
+  }
+  
+  function goToEvents() {
+    dispatch('navigate', { view: 'events' });
+  }
+  
+  function formatDate(timestamp) {
+    if (!timestamp) return 'N/A';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  }
+  
+  function formatCurrency(amount) {
+    return `$${parseFloat(amount).toFixed(2)}`;
+  }
+</script>
+
+<style>
+  .dashboard {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  
+  .dashboard h1 {
+    color: #2c3e50;
+    margin-bottom: 2rem;
+  }
+  
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  
+  .stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  .stat-card h3 {
+    margin: 0 0 0.5rem 0;
+    color: #7f8c8d;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  
+  .stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #2c3e50;
+  }
+  
+  .stat-value.positive {
+    color: #27ae60;
+  }
+  
+  .stat-value.negative {
+    color: #e74c3c;
+  }
+  
+  .section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 1.5rem;
+  }
+  
+  .section h2 {
+    margin: 0 0 1rem 0;
+    color: #2c3e50;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .btn-link {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  
+  .btn-link:hover {
+    background: #2980b9;
+  }
+  
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  th, td {
+    text-align: left;
+    padding: 0.75rem;
+    border-bottom: 1px solid #ecf0f1;
+  }
+  
+  th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #2c3e50;
+  }
+  
+  tr:hover {
+    background: #f8f9fa;
+  }
+  
+  .loading {
+    text-align: center;
+    padding: 2rem;
+    color: #7f8c8d;
+  }
+  
+  .empty {
+    text-align: center;
+    padding: 2rem;
+    color: #95a5a6;
+  }
+  
+  .view-btn {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  
+  .view-btn:hover {
+    background: #2980b9;
+  }
+  
+  .low-stock {
+    color: #e74c3c;
+    font-weight: bold;
+  }
+</style>
+
+<div class="dashboard">
+  <h1>Dashboard</h1>
+  
+  {#if loading}
+    <div class="loading">Loading dashboard...</div>
+  {:else}
+    <div class="stats-grid">
+      <div class="stat-card">
+        <h3>Total Events</h3>
+        <div class="stat-value">{events.length}</div>
+      </div>
+      
+      <div class="stat-card">
+        <h3>Leftover Funds</h3>
+        <div class="stat-value" class:positive={leftoverFunds >= 0} class:negative={leftoverFunds < 0}>
+          {formatCurrency(leftoverFunds)}
+        </div>
+      </div>
+      
+      <div class="stat-card">
+        <h3>Inventory Items</h3>
+        <div class="stat-value">{inventory.length}</div>
+      </div>
+      
+      <div class="stat-card">
+        <h3>Low Stock Items</h3>
+        <div class="stat-value">
+          {lowStockItems}
+        </div>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2>
+        Recent Events
+        <button class="btn-link" on:click={goToEvents}>View All</button>
+      </h2>
+      
+      {#if events.length === 0}
+        <div class="empty">No events yet. Create your first event!</div>
+      {:else}
+        <table>
+          <thead>
+            <tr>
+              <th>Event Name</th>
+              <th>Date</th>
+              <th>Ticket Price</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each events.slice(0, 5) as event}
+              <tr>
+                <td>{event.name}</td>
+                <td>{formatDate(event.date)}</td>
+                <td>{formatCurrency(event.ticketPrice || 0)}</td>
+                <td>
+                  <button class="view-btn" on:click={() => viewEvent(event.id)}>View</button>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {/if}
+    </div>
+    
+    <div class="section">
+      <h2>Inventory Summary</h2>
+      
+      {#if inventory.length === 0}
+        <div class="empty">No inventory items yet.</div>
+      {:else}
+        <table>
+          <thead>
+            <tr>
+              <th>Item Name</th>
+              <th>Type</th>
+              <th>Initial Quantity</th>
+              <th>Remaining</th>
+              <th>Cost/Unit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each inventory.slice(0, 10) as item}
+              <tr>
+                <td>{item.itemName}</td>
+                <td>{item.reusableType}</td>
+                <td>{item.initialQuantity}</td>
+                <td class:low-stock={typeof item.remainingQuantity === 'number' && item.remainingQuantity < 10}>
+                  {item.remainingQuantity}
+                </td>
+                <td>{formatCurrency(item.costPerUnit)}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {/if}
+    </div>
+  {/if}
+</div>
