@@ -132,9 +132,15 @@
     background: #2980b9;
   }
   
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
   table {
     width: 100%;
     border-collapse: collapse;
+    min-width: 500px;
   }
   
   th, td {
@@ -226,28 +232,30 @@
       {#if events.length === 0}
         <div class="empty">No events yet. Create your first event!</div>
       {:else}
-        <table>
-          <thead>
-            <tr>
-              <th>Event Name</th>
-              <th>Date</th>
-              <th>Ticket Price</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each events.slice(0, 5) as event}
+        <div class="table-wrapper">
+          <table>
+            <thead>
               <tr>
-                <td>{event.name}</td>
-                <td>{formatDate(event.date)}</td>
-                <td>{formatCurrency(event.ticketPrice || 0)}</td>
-                <td>
-                  <button class="view-btn" on:click={() => viewEvent(event.id)}>View</button>
-                </td>
+                <th>Event Name</th>
+                <th>Date</th>
+                <th>Ticket Price</th>
+                <th>Action</th>
               </tr>
-            {/each}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {#each events.slice(0, 5) as event}
+                <tr>
+                  <td>{event.name}</td>
+                  <td>{formatDate(event.date)}</td>
+                  <td>{formatCurrency(event.ticketPrice || 0)}</td>
+                  <td>
+                    <button class="view-btn" on:click={() => viewEvent(event.id)}>View</button>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
       {/if}
     </div>
     

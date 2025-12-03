@@ -50,6 +50,10 @@
     background: #f5f5f5;
   }
   
+  :global(*) {
+    box-sizing: border-box;
+  }
+  
   .app {
     min-height: 100vh;
   }
@@ -60,6 +64,7 @@
     align-items: center;
     min-height: 100vh;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 1rem;
   }
   
   .login-box {
@@ -69,6 +74,12 @@
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     width: 100%;
     max-width: 400px;
+  }
+  
+  @media (max-width: 480px) {
+    .login-box {
+      padding: 1.5rem;
+    }
   }
   
   .login-box h1 {
@@ -125,6 +136,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
   }
   
   nav h1 {
@@ -134,7 +147,8 @@
   
   .nav-links {
     display: flex;
-    gap: 1rem;
+    gap: 0.5rem;
+    flex-wrap: wrap;
   }
   
   .nav-link {
@@ -145,6 +159,7 @@
     padding: 0.5rem 1rem;
     border-radius: 4px;
     font-size: 1rem;
+    white-space: nowrap;
   }
   
   .nav-link:hover {
@@ -163,10 +178,46 @@
     border-radius: 4px;
     cursor: pointer;
     font-size: 1rem;
+    white-space: nowrap;
   }
   
   .logout-btn:hover {
     background: #c0392b;
+  }
+  
+  @media (max-width: 768px) {
+    nav {
+      padding: 1rem;
+    }
+    
+    nav h1 {
+      font-size: 1.2rem;
+      width: 100%;
+      text-align: center;
+    }
+    
+    .nav-links {
+      width: 100%;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    
+    .nav-link, .logout-btn {
+      font-size: 0.9rem;
+      padding: 0.4rem 0.8rem;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .nav-links {
+      flex-direction: column;
+      width: 100%;
+    }
+    
+    .nav-link, .logout-btn {
+      width: 100%;
+      text-align: center;
+    }
   }
 </style>
 

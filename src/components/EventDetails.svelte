@@ -382,9 +382,15 @@
     background: #7f8c8d;
   }
   
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
   table {
     width: 100%;
     border-collapse: collapse;
+    min-width: 600px;
   }
   
   th, td {
@@ -397,6 +403,17 @@
     background: #f8f9fa;
     font-weight: 600;
     color: #2c3e50;
+  }
+  
+  @media (max-width: 768px) {
+    table {
+      min-width: 500px;
+    }
+    
+    th, td {
+      padding: 0.5rem;
+      font-size: 0.9rem;
+    }
   }
   
   .modal-overlay {
@@ -577,26 +594,28 @@
         
         {#if financialSummary.costBreakdown.length > 0}
           <h3>Cost Breakdown</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Quantity Used</th>
-                <th>Cost/Unit</th>
-                <th>Total Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each financialSummary.costBreakdown as item}
+          <div class="table-wrapper">
+            <table>
+              <thead>
                 <tr>
-                  <td>{item.itemName}</td>
-                  <td>{item.quantityUsed}</td>
-                  <td>{formatCurrency(item.costPerUnit)}</td>
-                  <td>{formatCurrency(item.totalCost)}</td>
+                  <th>Item</th>
+                  <th>Quantity Used</th>
+                  <th>Cost/Unit</th>
+                  <th>Total Cost</th>
                 </tr>
-              {/each}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {#each financialSummary.costBreakdown as item}
+                  <tr>
+                    <td>{item.itemName}</td>
+                    <td>{item.quantityUsed}</td>
+                    <td>{formatCurrency(item.costPerUnit)}</td>
+                    <td>{formatCurrency(item.totalCost)}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
         {/if}
       </div>
     {/if}
@@ -613,37 +632,39 @@
       {#if attendees.length === 0}
         <div class="empty">No attendees yet.</div>
       {:else}
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Paid Amount</th>
-              <th>Payment Method</th>
-              <th>Checked In</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each attendees as attendee}
+        <div class="table-wrapper">
+          <table>
+            <thead>
               <tr>
-                <td>{attendee.name}</td>
-                <td>{formatCurrency(attendee.paidAmount)}</td>
-                <td>{attendee.paymentMethod || 'N/A'}</td>
-                <td class:checked-in={attendee.checkedIn}>
-                  {attendee.checkedIn ? '✓ Yes' : '✗ No'}
-                </td>
-                <td>
-                  <button class="btn btn-small" on:click={() => handleToggleCheckIn(attendee)}>
-                    {attendee.checkedIn ? 'Uncheck' : 'Check In'}
-                  </button>
-                  <button class="btn btn-small btn-danger" on:click={() => handleDeleteAttendee(attendee.id)}>
-                    Delete
-                  </button>
-                </td>
+                <th>Name</th>
+                <th>Paid Amount</th>
+                <th>Payment Method</th>
+                <th>Checked In</th>
+                <th>Actions</th>
               </tr>
-            {/each}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {#each attendees as attendee}
+                <tr>
+                  <td>{attendee.name}</td>
+                  <td>{formatCurrency(attendee.paidAmount)}</td>
+                  <td>{attendee.paymentMethod || 'N/A'}</td>
+                  <td class:checked-in={attendee.checkedIn}>
+                    {attendee.checkedIn ? '✓ Yes' : '✗ No'}
+                  </td>
+                  <td>
+                    <button class="btn btn-small" on:click={() => handleToggleCheckIn(attendee)}>
+                      {attendee.checkedIn ? 'Uncheck' : 'Check In'}
+                    </button>
+                    <button class="btn btn-small btn-danger" on:click={() => handleDeleteAttendee(attendee.id)}>
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
       {/if}
     </div>
     
@@ -659,22 +680,24 @@
       {#if usage.length === 0}
         <div class="empty">No inventory usage recorded.</div>
       {:else}
-        <table>
-          <thead>
-            <tr>
-              <th>Item Name</th>
-              <th>Quantity Used</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each usage as usageItem}
+        <div class="table-wrapper">
+          <table>
+            <thead>
               <tr>
-                <td>{usageItem.itemName}</td>
-                <td>{usageItem.quantityUsed}</td>
+                <th>Item Name</th>
+                <th>Quantity Used</th>
               </tr>
-            {/each}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {#each usage as usageItem}
+                <tr>
+                  <td>{usageItem.itemName}</td>
+                  <td>{usageItem.quantityUsed}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
       {/if}
     </div>
   {:else}

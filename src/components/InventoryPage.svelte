@@ -140,9 +140,15 @@
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   }
   
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
   table {
     width: 100%;
     border-collapse: collapse;
+    min-width: 800px;
   }
   
   th, td {
@@ -326,6 +332,92 @@
     color: #7f8c8d;
     font-size: 0.9rem;
   }
+  
+  /* Mobile/Desktop Toggle */
+  .desktop-only {
+    display: block;
+  }
+  
+  .mobile-only {
+    display: none;
+  }
+  
+  @media (max-width: 768px) {
+    .desktop-only {
+      display: none;
+    }
+    
+    .mobile-only {
+      display: block;
+    }
+  }
+  
+  /* Mobile Card Layout */
+  .inventory-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .inventory-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow: hidden;
+  }
+  
+  .card-header {
+    background: #f8f9fa;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #e9ecef;
+  }
+  
+  .card-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #2c3e50;
+  }
+  
+  .card-body {
+    padding: 1rem;
+  }
+  
+  .card-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f1f3f5;
+  }
+  
+  .card-row:last-child {
+    border-bottom: none;
+  }
+  
+  .card-row .label {
+    font-weight: 500;
+    color: #7f8c8d;
+    font-size: 0.9rem;
+  }
+  
+  .card-row .value {
+    font-weight: 600;
+    color: #2c3e50;
+  }
+  
+  .card-footer {
+    padding: 1rem;
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+  }
+  
+  .btn-full {
+    width: 100%;
+    text-align: center;
+  }
 </style>
 
 <div class="inventory-page">
@@ -392,34 +484,88 @@
         <div class="results-count">
           Showing {filteredAndSortedInventory.length} of {inventory.length} items
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Item Name</th>
-              <th>Category</th>
-              <th>Type</th>
-              <th>Initial Quantity</th>
-              <th>Used</th>
-              <th>Remaining</th>
-              <th>Cost/Unit</th>
-              <th>Total Cost</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each filteredAndSortedInventory as item}
+        
+        <!-- Desktop Table View -->
+        <div class="table-wrapper desktop-only">
+          <table>
+            <thead>
               <tr>
-                <td>{item.itemName}</td>
-                <td>{item.category || 'N/A'}</td>
-                <td>
-                  <span class="badge" class:badge-reusable={item.reusableType === 'reusable'} class:badge-consumable={item.reusableType === 'consumable'}>
-                    {item.reusableType}
-                  </span>
-                </td>
-                <td>{item.initialQuantity}</td>
-                <td>{item.quantityUsed || 0}</td>
-                <td>
-                  <span class="stock-status" 
+                <th>Item Name</th>
+                <th>Category</th>
+                <th>Type</th>
+                <th>Initial Quantity</th>
+                <th>Used</th>
+                <th>Remaining</th>
+                <th>Cost/Unit</th>
+                <th>Total Cost</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each filteredAndSortedInventory as item}
+                <tr>
+                  <td>{item.itemName}</td>
+                  <td>{item.category || 'N/A'}</td>
+                  <td>
+                    <span class="badge" class:badge-reusable={item.reusableType === 'reusable'} class:badge-consumable={item.reusableType === 'consumable'}>
+                      {item.reusableType}
+                    </span>
+                  </td>
+                  <td>{item.initialQuantity}</td>
+                  <td>{item.quantityUsed || 0}</td>
+                  <td>
+                    <span class="stock-status" 
+                      class:stock-good={getStockStatus(item) === 'good'}
+                      class:stock-medium={getStockStatus(item) === 'medium'}
+                      class:stock-low={getStockStatus(item) === 'low'}
+                      class:stock-negative={getStockStatus(item) === 'negative'}
+                    >
+                      {item.remainingQuantity}
+                    </span>
+                  </td>
+                  <td>{formatCurrency(item.costPerUnit)}</td>
+                  <td>{formatCurrency(item.totalCost)}</td>
+                  <td>
+                    <button class="btn" on:click={() => viewUsageHistory(item)}>
+                      Usage History
+                    </button>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Mobile Card View -->
+        <div class="mobile-only inventory-cards">
+          {#each filteredAndSortedInventory as item}
+            <div class="inventory-card">
+              <div class="card-header">
+                <h3>{item.itemName}</h3>
+                <span class="badge" class:badge-reusable={item.reusableType === 'reusable'} class:badge-consumable={item.reusableType === 'consumable'}>
+                  {item.reusableType}
+                </span>
+              </div>
+              
+              <div class="card-body">
+                <div class="card-row">
+                  <span class="label">Category:</span>
+                  <span class="value">{item.category || 'N/A'}</span>
+                </div>
+                
+                <div class="card-row">
+                  <span class="label">Initial:</span>
+                  <span class="value">{item.initialQuantity}</span>
+                </div>
+                
+                <div class="card-row">
+                  <span class="label">Used:</span>
+                  <span class="value">{item.quantityUsed || 0}</span>
+                </div>
+                
+                <div class="card-row">
+                  <span class="label">Remaining:</span>
+                  <span class="value stock-status" 
                     class:stock-good={getStockStatus(item) === 'good'}
                     class:stock-medium={getStockStatus(item) === 'medium'}
                     class:stock-low={getStockStatus(item) === 'low'}
@@ -427,18 +573,27 @@
                   >
                     {item.remainingQuantity}
                   </span>
-                </td>
-                <td>{formatCurrency(item.costPerUnit)}</td>
-                <td>{formatCurrency(item.totalCost)}</td>
-                <td>
-                  <button class="btn" on:click={() => viewUsageHistory(item)}>
-                    Usage History
-                  </button>
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
+                </div>
+                
+                <div class="card-row">
+                  <span class="label">Cost/Unit:</span>
+                  <span class="value">{formatCurrency(item.costPerUnit)}</span>
+                </div>
+                
+                <div class="card-row">
+                  <span class="label">Total Cost:</span>
+                  <span class="value">{formatCurrency(item.totalCost)}</span>
+                </div>
+              </div>
+              
+              <div class="card-footer">
+                <button class="btn btn-full" on:click={() => viewUsageHistory(item)}>
+                  📊 Usage History
+                </button>
+              </div>
+            </div>
+          {/each}
+        </div>
       {/if}
     </div>
   {/if}

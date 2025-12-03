@@ -161,9 +161,15 @@
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   }
   
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
   table {
     width: 100%;
     border-collapse: collapse;
+    min-width: 700px;
   }
   
   th, td {

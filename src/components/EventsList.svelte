@@ -197,6 +197,24 @@
     align-items: flex-start;
   }
   
+  @media (max-width: 768px) {
+    .event-card {
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .event-actions {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .event-actions .btn {
+      width: 100%;
+    }
+  }
+  
   .event-info h3 {
     margin: 0 0 0.5rem 0;
     color: #2c3e50;
