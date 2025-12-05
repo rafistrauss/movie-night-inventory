@@ -18,8 +18,29 @@
   onMount(() => {
     onAuthStateChanged(auth, (authUser) => {
       user = authUser;
+      if (authUser) {
+        // Initialize route from URL
+        updateViewFromUrl();
+        
+        // Handle browser back/forward
+        window.addEventListener('popstate', updateViewFromUrl);
+      }
     });
   });
+  
+  function updateViewFromUrl() {
+    const hash = window.location.hash.slice(1) || 'dashboard';
+    const parts = hash.split('/');
+    const view = parts[0];
+    
+    if (view === 'event' && parts[1]) {
+      currentView = 'eventDetails';
+      selectedEventId = parts[1];
+    } else {
+      currentView = view;
+      selectedEventId = null;
+    }
+  }
   
   async function handleLogin() {
     try {
@@ -39,6 +60,16 @@
   function navigate(view, eventId = null) {
     currentView = view;
     selectedEventId = eventId;
+    
+    // Update URL and browser history
+    let hash = '#' + view;
+    if (view === 'eventDetails' && eventId) {
+      hash = '#event/' + eventId;
+    }
+    
+    if (window.location.hash !== hash) {
+      window.history.pushState({}, '', hash);
+    }
   }
 </script>
 
@@ -48,6 +79,8 @@
     margin: 0;
     padding: 0;
     background: #f5f5f5;
+    width: 100%;
+    overflow-x: hidden;
   }
   
   :global(*) {
@@ -56,6 +89,9 @@
   
   .app {
     min-height: 100vh;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
   
   .login-container {
@@ -218,6 +254,12 @@
       width: 100%;
       text-align: center;
     }
+  }
+  
+  main {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
 </style>
 

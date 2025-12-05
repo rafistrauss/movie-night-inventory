@@ -104,6 +104,8 @@
     padding: 2rem;
     max-width: 1200px;
     margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
   }
   
   .header {
@@ -159,6 +161,8 @@
     padding: 1.5rem;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    width: 100%;
+    overflow-x: hidden;
   }
   
   .table-wrapper {
@@ -195,6 +199,8 @@
     justify-content: center;
     align-items: center;
     z-index: 1000;
+    overflow-y: auto;
+    padding: 1rem 0;
   }
   
   .modal {
@@ -205,6 +211,8 @@
     width: 90%;
     max-height: 90vh;
     overflow-y: auto;
+    box-sizing: border-box;
+    margin: auto;
   }
   
   .modal h2 {
@@ -280,6 +288,133 @@
     display: flex;
     gap: 0.5rem;
   }
+  
+  /* Mobile Card View for Better Readability */
+  .mobile-card {
+    display: none;
+  }
+  
+  @media (max-width: 768px) {
+    .expenses-page {
+      padding: 1rem;
+    }
+    
+    .header {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 1rem;
+    }
+    
+    .header h1 {
+      font-size: 1.5rem;
+    }
+    
+    .header .btn {
+      width: 100%;
+      min-height: 48px;
+    }
+    
+    .section {
+      padding: 0.5rem;
+    }
+    
+    /* Hide table, show cards instead */
+    .table-wrapper {
+      display: none;
+    }
+    
+    .mobile-card {
+      display: block;
+    }
+    
+    .expense-card {
+      background: white;
+      border: 1px solid #ecf0f1;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .expense-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 0.75rem;
+      gap: 0.5rem;
+    }
+    
+    .expense-card-title {
+      font-weight: 600;
+      color: #2c3e50;
+      font-size: 1rem;
+      flex: 1;
+    }
+    
+    .expense-card-body {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+      font-size: 0.9rem;
+    }
+    
+    .expense-card-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    
+    .expense-card-label {
+      color: #7f8c8d;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+    
+    .expense-card-value {
+      color: #2c3e50;
+      font-weight: 500;
+    }
+    
+    .expense-card-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .expense-card-actions .btn {
+      flex: 1;
+      min-height: 44px;
+    }
+    
+    .modal {
+      width: 95%;
+      max-width: 95%;
+      padding: 1.5rem;
+      max-height: 85vh;
+    }
+    
+    .modal h2 {
+      font-size: 1.3rem;
+    }
+    
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+    
+    .form-actions {
+      flex-direction: column-reverse;
+      gap: 0.75rem;
+    }
+    
+    .form-actions button {
+      width: 100%;
+      min-height: 48px;
+    }
+    
+    .badge {
+      font-size: 0.75rem;
+    }
+  }
 </style>
 
 <div class="expenses-page">
@@ -295,45 +430,90 @@
       {#if expenses.length === 0}
         <div class="empty">No expenses recorded yet.</div>
       {:else}
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Category</th>
-              <th>Type</th>
-              <th>Cost</th>
-              <th>Quantity</th>
-              <th>Event</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each expenses as expense}
+        <!-- Desktop Table View -->
+        <div class="table-wrapper">
+          <table>
+            <thead>
               <tr>
-                <td>{expense.name}</td>
-                <td>{expense.category || 'N/A'}</td>
-                <td>
-                  <span class="badge" class:badge-reusable={expense.reusableType === 'reusable'} class:badge-consumable={expense.reusableType === 'consumable'}>
-                    {expense.reusableType}
-                  </span>
-                </td>
-                <td>{formatCurrency(expense.cost)}</td>
-                <td>{expense.quantityPurchased}</td>
-                <td>{getEventName(expense.eventId)}</td>
-                <td>
-                  <div class="actions">
-                    <button class="btn btn-small" on:click={() => openEditForm(expense)}>
-                      Edit
-                    </button>
-                    <button class="btn btn-small btn-danger" on:click={() => handleDelete(expense.id)}>
-                      Delete
-                    </button>
-                  </div>
-                </td>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Type</th>
+                <th>Cost</th>
+                <th>Quantity</th>
+                <th>Event</th>
+                <th>Actions</th>
               </tr>
-            {/each}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {#each expenses as expense}
+                <tr>
+                  <td>{expense.name}</td>
+                  <td>{expense.category || 'N/A'}</td>
+                  <td>
+                    <span class="badge" class:badge-reusable={expense.reusableType === 'reusable'} class:badge-consumable={expense.reusableType === 'consumable'}>
+                      {expense.reusableType}
+                    </span>
+                  </td>
+                  <td>{formatCurrency(expense.cost)}</td>
+                  <td>{expense.quantityPurchased}</td>
+                  <td>{getEventName(expense.eventId)}</td>
+                  <td>
+                    <div class="actions">
+                      <button class="btn btn-small" on:click={() => openEditForm(expense)}>
+                        Edit
+                      </button>
+                      <button class="btn btn-small btn-danger" on:click={() => handleDelete(expense.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Mobile Card View -->
+        <div class="mobile-card">
+          {#each expenses as expense}
+            <div class="expense-card">
+              <div class="expense-card-header">
+                <div class="expense-card-title">{expense.name}</div>
+                <span class="badge" class:badge-reusable={expense.reusableType === 'reusable'} class:badge-consumable={expense.reusableType === 'consumable'}>
+                  {expense.reusableType}
+                </span>
+              </div>
+              
+              <div class="expense-card-body">
+                <div class="expense-card-field">
+                  <span class="expense-card-label">Category</span>
+                  <span class="expense-card-value">{expense.category || 'N/A'}</span>
+                </div>
+                <div class="expense-card-field">
+                  <span class="expense-card-label">Cost</span>
+                  <span class="expense-card-value">{formatCurrency(expense.cost)}</span>
+                </div>
+                <div class="expense-card-field">
+                  <span class="expense-card-label">Quantity</span>
+                  <span class="expense-card-value">{expense.quantityPurchased}</span>
+                </div>
+                <div class="expense-card-field">
+                  <span class="expense-card-label">Event</span>
+                  <span class="expense-card-value">{getEventName(expense.eventId)}</span>
+                </div>
+              </div>
+              
+              <div class="expense-card-actions">
+                <button class="btn btn-small" on:click={() => openEditForm(expense)}>
+                  Edit
+                </button>
+                <button class="btn btn-small btn-danger" on:click={() => handleDelete(expense.id)}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          {/each}
+        </div>
       {/if}
     </div>
   {/if}

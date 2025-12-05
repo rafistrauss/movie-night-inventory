@@ -119,6 +119,8 @@
     padding: 2rem;
     max-width: 1400px;
     margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
   }
   
   .header {
@@ -138,6 +140,8 @@
     padding: 1.5rem;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    width: 100%;
+    overflow-x: hidden;
   }
   
   .table-wrapper {
@@ -246,6 +250,8 @@
     justify-content: center;
     align-items: center;
     z-index: 1000;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
   
   .modal {
@@ -256,6 +262,8 @@
     width: 90%;
     max-height: 90vh;
     overflow-y: auto;
+    box-sizing: border-box;
+    margin: 1rem;
   }
   
   .modal h2 {
@@ -305,6 +313,8 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1rem;
+    width: 100%;
+    box-sizing: border-box;
   }
   
   .filter-group {
@@ -417,6 +427,133 @@
   .btn-full {
     width: 100%;
     text-align: center;
+  }
+  
+  /* Comprehensive Mobile Styles */
+  @media (max-width: 768px) {
+    .inventory-page {
+      padding: 1rem;
+    }
+    
+    .header h1 {
+      font-size: 1.5rem;
+    }
+    
+    .filters {
+      padding: 1rem;
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+    }
+    
+    .filter-group input,
+    .filter-group select {
+      font-size: 16px;
+    }
+    
+    .section {
+      padding: 0.5rem;
+      border-radius: 4px;
+    }
+    
+    .results-count {
+      padding: 0 0.5rem;
+      font-size: 0.85rem;
+    }
+    
+    .inventory-card {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    
+    .card-header {
+      padding: 0.75rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    
+    .card-header h3 {
+      font-size: 1rem;
+      flex: 1;
+      min-width: 0;
+      word-break: break-word;
+    }
+    
+    .card-body {
+      padding: 0.75rem;
+    }
+    
+    .card-row {
+      padding: 0.4rem 0;
+      font-size: 0.9rem;
+    }
+    
+    .card-footer {
+      padding: 0.75rem;
+    }
+    
+    .btn {
+      min-height: 44px;
+      font-size: 0.9rem;
+    }
+    
+    .modal {
+      width: 95%;
+      max-width: 95%;
+      padding: 1rem;
+      margin: 0.5rem;
+      max-height: 85vh;
+    }
+    
+    .modal h2 {
+      font-size: 1.2rem;
+      margin-bottom: 0.75rem;
+    }
+    
+    .modal h3 {
+      font-size: 1rem;
+    }
+    
+    .info-grid {
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+      padding: 0.75rem;
+    }
+    
+    .info-item {
+      padding: 0.25rem 0;
+    }
+    
+    .info-value {
+      font-size: 1rem;
+    }
+    
+    .modal table {
+      font-size: 0.85rem;
+      min-width: 100%;
+    }
+    
+    .modal th,
+    .modal td {
+      padding: 0.5rem 0.25rem;
+    }
+    
+    .modal-actions {
+      margin-top: 1rem;
+    }
+    
+    .modal-actions .btn {
+      width: 100%;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .inventory-page {
+      padding: 0.75rem;
+    }
+    
+    .card-header h3 {
+      font-size: 0.95rem;
+    }
   }
 </style>
 

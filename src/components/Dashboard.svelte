@@ -41,12 +41,41 @@
   
   function formatDate(timestamp) {
     if (!timestamp) return 'N/A';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
+    
+    try {
+      let date;
+      
+      // Handle Firestore Timestamp
+      if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+        date = timestamp.toDate();
+      } 
+      // Handle ISO string or date string
+      else if (typeof timestamp === 'string') {
+        date = new Date(timestamp);
+      }
+      // Handle seconds (Firestore timestamp format)
+      else if (timestamp.seconds) {
+        date = new Date(timestamp.seconds * 1000);
+      }
+      // Handle Date object or number
+      else {
+        date = new Date(timestamp);
+      }
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error, timestamp);
+      return 'Invalid Date';
+    }
   }
   
   function formatCurrency(amount) {
@@ -59,6 +88,8 @@
     padding: 2rem;
     max-width: 1400px;
     margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
   }
   
   .dashboard h1 {
@@ -108,6 +139,8 @@
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     margin-bottom: 1.5rem;
+    width: 100%;
+    overflow-x: hidden;
   }
   
   .section h2 {
@@ -189,6 +222,88 @@
     color: #e74c3c;
     font-weight: bold;
   }
+  
+  .hide-mobile {
+    /* Hidden on mobile via media query */
+  }
+  
+  /* Mobile Optimizations */
+  @media (max-width: 768px) {
+    .hide-mobile {
+      display: none;
+    }
+    .dashboard {
+      padding: 1rem;
+    }
+    
+    .dashboard h1 {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    .stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .stat-card {
+      padding: 1rem;
+    }
+    
+    .stat-card h3 {
+      font-size: 0.75rem;
+    }
+    
+    .stat-value {
+      font-size: 1.5rem;
+    }
+    
+    .section {
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .section h2 {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.75rem;
+      font-size: 1.2rem;
+    }
+    
+    .btn-link, .view-btn {
+      width: 100%;
+      text-align: center;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    table {
+      font-size: 0.85rem;
+      min-width: 100%;
+    }
+    
+    th, td {
+      padding: 0.5rem 0.4rem;
+    }
+    
+    /* Adjust remaining columns to fill space */
+    th:first-child, td:first-child {
+      width: 45%;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .stats-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .stat-value {
+      font-size: 1.75rem;
+    }
+  }
 </style>
 
 <div class="dashboard">
@@ -265,30 +380,32 @@
       {#if inventory.length === 0}
         <div class="empty">No inventory items yet.</div>
       {:else}
-        <table>
-          <thead>
-            <tr>
-              <th>Item Name</th>
-              <th>Type</th>
-              <th>Initial Quantity</th>
-              <th>Remaining</th>
-              <th>Cost/Unit</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each inventory.slice(0, 10) as item}
+        <div class="table-wrapper">
+          <table>
+            <thead>
               <tr>
-                <td>{item.itemName}</td>
-                <td>{item.reusableType}</td>
-                <td>{item.initialQuantity}</td>
-                <td class:low-stock={typeof item.remainingQuantity === 'number' && item.remainingQuantity < 10}>
-                  {item.remainingQuantity}
-                </td>
-                <td>{formatCurrency(item.costPerUnit)}</td>
+                <th>Item Name</th>
+                <th class="hide-mobile">Type</th>
+                <th class="hide-mobile">Initial Quantity</th>
+                <th>Remaining</th>
+                <th>Cost/Unit</th>
               </tr>
-            {/each}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {#each inventory.slice(0, 10) as item}
+                <tr>
+                  <td>{item.itemName}</td>
+                  <td class="hide-mobile">{item.reusableType}</td>
+                  <td class="hide-mobile">{item.initialQuantity}</td>
+                  <td class:low-stock={typeof item.remainingQuantity === 'number' && item.remainingQuantity < 10}>
+                    {item.remainingQuantity}
+                  </td>
+                  <td>{formatCurrency(item.costPerUnit)}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
       {/if}
     </div>
   {/if}

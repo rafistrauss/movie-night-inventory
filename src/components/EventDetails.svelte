@@ -274,12 +274,41 @@
   
   function formatDate(timestamp) {
     if (!timestamp) return 'N/A';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
+    
+    try {
+      let date;
+      
+      // Handle Firestore Timestamp
+      if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+        date = timestamp.toDate();
+      } 
+      // Handle ISO string or date string
+      else if (typeof timestamp === 'string') {
+        date = new Date(timestamp);
+      }
+      // Handle seconds (Firestore timestamp format)
+      else if (timestamp.seconds) {
+        date = new Date(timestamp.seconds * 1000);
+      }
+      // Handle Date object or number
+      else {
+        date = new Date(timestamp);
+      }
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error, timestamp);
+      return 'Invalid Date';
+    }
   }
   
   function formatCurrency(amount) {
@@ -292,6 +321,8 @@
     padding: 2rem;
     max-width: 1200px;
     margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
   }
   
   .back-btn {

@@ -2,12 +2,32 @@
   box-sizing: border-box;
 }
 
+html, body {
+  width: 100%;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
 button {
   font-family: inherit;
 }
 
 input, select, textarea {
   font-family: inherit;
+  max-width: 100%;
+}
+
+/* Prevent zoom on iOS when focusing inputs */
+input, select, textarea {
+  font-size: 16px;
+}
+
+/* Ensure all containers respect viewport */
+div, section, main {
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Mobile-Responsive Styles */
