@@ -23,8 +23,18 @@
   let showBulkAddAttendees = false;
   let showBulkAddUsage = false;
   let showEditEvent = false;
+  let showEditAttendee = false;
   
   let newAttendee = {
+    name: '',
+    paidAmount: 0,
+    paymentMethod: '',
+    checkedIn: false,
+    notes: ''
+  };
+  
+  let editAttendeeData = {
+    id: '',
     name: '',
     paidAmount: 0,
     paymentMethod: '',
@@ -46,6 +56,8 @@
     ticketPrice: 0,
     notes: ''
   };
+  
+  let syncing = false;
   
   onMount(async () => {
     await loadEventData();
@@ -103,6 +115,43 @@
       console.error('Error loading event data:', error);
     } finally {
       loading = false;
+      syncing = false;
+    }
+  }
+  
+  async function handleResync() {
+    try {
+      console.log('Re-syncing event data...');
+      syncing = true;
+      
+      // Import and clear the cache before fetching fresh data
+      const { dataCache } = await import('../services/cacheService');
+      console.log('Clearing cache for event:', eventId);
+      dataCache.invalidate(`attendees_${eventId}`);
+      dataCache.invalidate(`usage_${eventId}`);
+      dataCache.invalidate(`financialSummary_${eventId}`);
+      
+      console.log('Fetching attendees for event:', eventId);
+      const newAttendees = await getAttendees(eventId);
+      console.log('Received attendees:', newAttendees);
+      attendees = [...newAttendees];
+      
+      console.log('Fetching usage...');
+      const newUsage = await getUsageByEvent(eventId);
+      console.log('Received usage:', newUsage);
+      usage = [...newUsage];
+      
+      console.log('Fetching financial summary...');
+      const newFinancialSummary = await getEventFinancialSummary(eventId);
+      console.log('Received financial summary:', newFinancialSummary);
+      financialSummary = { ...newFinancialSummary };
+      
+      console.log('Re-sync complete! Attendees count:', attendees.length);
+    } catch (error) {
+      console.error('Error re-syncing data:', error);
+      alert('Error re-syncing data: ' + error.message);
+    } finally {
+      syncing = false;
     }
   }
   
@@ -115,6 +164,30 @@
     } catch (error) {
       console.error('Error adding attendee:', error);
       alert('Error adding attendee: ' + error.message);
+    }
+  }
+  
+  function openEditAttendee(attendee) {
+    editAttendeeData = {
+      id: attendee.id,
+      name: attendee.name,
+      paidAmount: attendee.paidAmount,
+      paymentMethod: attendee.paymentMethod || '',
+      checkedIn: attendee.checkedIn || false,
+      notes: attendee.notes || ''
+    };
+    showEditAttendee = true;
+  }
+  
+  async function handleEditAttendee() {
+    try {
+      const { id, ...attendeeData } = editAttendeeData;
+      await updateAttendee(eventId, id, attendeeData);
+      showEditAttendee = false;
+      await loadEventData();
+    } catch (error) {
+      console.error('Error updating attendee:', error);
+      alert('Error updating attendee: ' + error.message);
     }
   }
   
@@ -610,6 +683,15 @@
     border-radius: 3px;
     font-family: monospace;
   }
+  
+  .sync-note {
+    background: #e8f5e9;
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    color: #2e7d32;
+    font-size: 0.9rem;
+    border-left: 3px solid #4caf50;
+  }
 </style>
 
 <div class="event-details">
@@ -619,7 +701,7 @@
     <div class="loading">Loading event details...</div>
   {:else if event}
     <div class="event-header">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
         <div>
           <h1>{event.name}</h1>
           <div class="event-meta">📅 {formatDate(event.date)}</div>
@@ -628,7 +710,15 @@
             <div class="event-meta">📝 {event.notes}</div>
           {/if}
         </div>
-        <button class="btn btn-small" on:click={() => showEditEvent = true}>✏️ Edit</button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="btn btn-secondary btn-small" on:click={handleResync} disabled={syncing} title="Refresh all data from database">
+            {syncing ? '⏳ Syncing...' : '🔄 Re-sync'}
+          </button>
+          <button class="btn btn-small" on:click={() => showEditEvent = true}>✏️ Edit</button>
+        </div>
+      </div>
+      <div class="sync-note">
+        💡 Tip: Use the Re-sync button if data doesn't appear as expected
       </div>
     </div>
     
@@ -713,12 +803,17 @@
                     {attendee.checkedIn ? '✓ Yes' : '✗ No'}
                   </td>
                   <td>
-                    <button class="btn btn-small" on:click={() => handleToggleCheckIn(attendee)}>
-                      {attendee.checkedIn ? 'Uncheck' : 'Check In'}
-                    </button>
-                    <button class="btn btn-small btn-danger" on:click={() => handleDeleteAttendee(attendee.id)}>
-                      Delete
-                    </button>
+                    <div class="btn-group">
+                      <button class="btn btn-small" on:click={() => openEditAttendee(attendee)}>
+                        Edit
+                      </button>
+                      <button class="btn btn-small" on:click={() => handleToggleCheckIn(attendee)}>
+                        {attendee.checkedIn ? 'Uncheck' : 'Check In'}
+                      </button>
+                      <button class="btn btn-small btn-danger" on:click={() => handleDeleteAttendee(attendee.id)}>
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               {/each}
@@ -1001,6 +1096,72 @@
           
           <div class="form-actions">
             <button type="button" class="btn btn-secondary" on:click={() => showEditEvent = false}>
+              Cancel
+            </button>
+            <button type="submit" class="btn">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  {/if}
+  
+  {#if showEditAttendee}
+    <div class="modal-overlay" on:click={() => showEditAttendee = false}>
+      <div class="modal" on:click|stopPropagation>
+        <h2>Edit Attendee</h2>
+        <form on:submit|preventDefault={handleEditAttendee}>
+          <div class="form-group">
+            <label for="editAttendeeName">Name *</label>
+            <input 
+              id="editAttendeeName" 
+              type="text" 
+              bind:value={editAttendeeData.name} 
+              required 
+            />
+          </div>
+          
+          <div class="form-group">
+            <label for="editPaidAmount">Paid Amount *</label>
+            <input 
+              id="editPaidAmount" 
+              type="number" 
+              step="0.01" 
+              bind:value={editAttendeeData.paidAmount} 
+              required 
+            />
+          </div>
+          
+          <div class="form-group">
+            <label for="editPaymentMethod">Payment Method</label>
+            <input 
+              id="editPaymentMethod" 
+              type="text" 
+              bind:value={editAttendeeData.paymentMethod} 
+              placeholder="e.g., Cash, Venmo"
+            />
+          </div>
+          
+          <div class="form-group">
+            <div class="checkbox-group">
+              <input 
+                id="editCheckedIn" 
+                type="checkbox" 
+                bind:checked={editAttendeeData.checkedIn} 
+              />
+              <label for="editCheckedIn">Checked In</label>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="editAttendeeNotes">Notes</label>
+            <textarea 
+              id="editAttendeeNotes" 
+              bind:value={editAttendeeData.notes} 
+            />
+          </div>
+          
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" on:click={() => showEditAttendee = false}>
               Cancel
             </button>
             <button type="submit" class="btn">Save Changes</button>
