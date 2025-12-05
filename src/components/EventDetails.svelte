@@ -6,6 +6,7 @@
   import { getUsageByEvent, addUsage, bulkAddUsage } from '../services/usageService';
   import { getEventFinancialSummary } from '../services/reportingService';
   import { buildInventory, validateUsage } from '../services/inventoryService';
+  import { getExpensesByEvent } from '../services/expenseService';
   
   export let eventId;
   
@@ -16,6 +17,7 @@
   let usage = [];
   let inventory = [];
   let financialSummary = null;
+  let purchases = [];
   let loading = true;
   
   let showAddAttendee = false;
@@ -71,6 +73,7 @@
       usage = await getUsageByEvent(eventId);
       inventory = await buildInventory();
       financialSummary = await getEventFinancialSummary(eventId);
+      purchases = await getExpensesByEvent(eventId);
       
       // Populate edit form data
       if (event) {
@@ -130,6 +133,7 @@
       dataCache.invalidate(`attendees_${eventId}`);
       dataCache.invalidate(`usage_${eventId}`);
       dataCache.invalidate(`financialSummary_${eventId}`);
+      dataCache.invalidate(`expenses_${eventId}`);
       
       console.log('Fetching attendees for event:', eventId);
       const newAttendees = await getAttendees(eventId);
@@ -145,6 +149,11 @@
       const newFinancialSummary = await getEventFinancialSummary(eventId);
       console.log('Received financial summary:', newFinancialSummary);
       financialSummary = { ...newFinancialSummary };
+      
+      console.log('Fetching purchases...');
+      const newPurchases = await getExpensesByEvent(eventId);
+      console.log('Received purchases:', newPurchases);
+      purchases = [...newPurchases];
       
       console.log('Re-sync complete! Attendees count:', attendees.length);
     } catch (error) {
@@ -653,6 +662,10 @@
     color: #2c3e50;
   }
   
+  .financial-value.cost {
+    color: #e67e22;
+  }
+  
   .profit {
     color: #27ae60;
   }
@@ -692,6 +705,46 @@
     font-size: 0.9rem;
     border-left: 3px solid #4caf50;
   }
+  
+  .badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+  
+  .badge-reusable {
+    background: #3498db;
+    color: white;
+  }
+  
+  .badge-consumable {
+    background: #f39c12;
+    color: white;
+  }
+  
+  .low-stock {
+    color: #e74c3c;
+    font-weight: bold;
+  }
+  
+  .profit-explanation {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-left: 3px solid #3498db;
+    color: #2c3e50;
+    font-size: 0.9rem;
+    border-radius: 4px;
+    line-height: 1.6;
+  }
+  
+  @media (max-width: 768px) {
+    .financial-grid {
+      grid-template-columns: 1fr;
+    }
+  }
 </style>
 
 <div class="event-details">
@@ -727,40 +780,57 @@
         <h2>Financial Summary</h2>
         <div class="financial-grid">
           <div class="financial-card">
-            <h3>Revenue</h3>
+            <h3>Revenue Collected</h3>
             <div class="financial-value">{formatCurrency(financialSummary.revenue)}</div>
           </div>
           <div class="financial-card">
-            <h3>Total Cost</h3>
-            <div class="financial-value">{formatCurrency(financialSummary.totalCost)}</div>
+            <h3>Direct Purchase Cost</h3>
+            <div class="financial-value cost">{formatCurrency(financialSummary.totalPurchaseCost)}</div>
           </div>
           <div class="financial-card">
-            <h3>Profit/Loss</h3>
-            <div class="financial-value" class:profit={parseFloat(financialSummary.profit) >= 0} class:loss={parseFloat(financialSummary.profit) < 0}>
-              {formatCurrency(financialSummary.profit)}
+            <h3>Profit by Purchase</h3>
+            <div class="financial-value" class:profit={parseFloat(financialSummary.profitByPurchase) >= 0} class:loss={parseFloat(financialSummary.profitByPurchase) < 0}>
+              {formatCurrency(financialSummary.profitByPurchase)}
+            </div>
+          </div>
+          <div class="financial-card">
+            <h3>Usage-Based Cost</h3>
+            <div class="financial-value cost">{formatCurrency(financialSummary.totalUsageCost)}</div>
+          </div>
+          <div class="financial-card">
+            <h3>Profit by Usage</h3>
+            <div class="financial-value" class:profit={parseFloat(financialSummary.profitByUsage) >= 0} class:loss={parseFloat(financialSummary.profitByUsage) < 0}>
+              {formatCurrency(financialSummary.profitByUsage)}
             </div>
           </div>
         </div>
         
-        {#if financialSummary.costBreakdown.length > 0}
+        <div class="profit-explanation">
+          <strong>Profit by Purchase</strong> = Revenue - Direct Purchase Cost (what you actually spent)<br>
+          <strong>Profit by Usage</strong> = Revenue - Usage-Based Cost (accounting for inventory value consumed)
+        </div>
+        
+        {#if financialSummary.costBreakdown && financialSummary.costBreakdown.length > 0}
           <h3>Cost Breakdown</h3>
           <div class="table-wrapper">
             <table>
               <thead>
                 <tr>
                   <th>Item</th>
-                  <th>Quantity Used</th>
-                  <th>Cost/Unit</th>
-                  <th>Total Cost</th>
+                  <th>Qty Purchased</th>
+                  <th>Purchase Cost</th>
+                  <th>Qty Used</th>
+                  <th>Usage Cost</th>
                 </tr>
               </thead>
               <tbody>
                 {#each financialSummary.costBreakdown as item}
                   <tr>
                     <td>{item.itemName}</td>
-                    <td>{item.quantityUsed}</td>
-                    <td>{formatCurrency(item.costPerUnit)}</td>
-                    <td>{formatCurrency(item.totalCost)}</td>
+                    <td>{item.quantityPurchased || '-'}</td>
+                    <td>{item.purchaseCost > 0 ? formatCurrency(item.purchaseCost) : '-'}</td>
+                    <td>{item.quantityUsed || '-'}</td>
+                    <td>{item.usageCost > 0 ? formatCurrency(item.usageCost) : '-'}</td>
                   </tr>
                 {/each}
               </tbody>
@@ -825,7 +895,48 @@
     
     <div class="section">
       <div class="section-header">
-        <h2>Inventory Usage</h2>
+        <h2>Purchases for this Event</h2>
+      </div>
+      
+      {#if purchases.length === 0}
+        <div class="empty">No purchases recorded for this event.</div>
+      {:else}
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Item Name</th>
+                <th>Category</th>
+                <th>Type</th>
+                <th>Quantity Purchased</th>
+                <th>Cost</th>
+                <th>Cost/Unit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each purchases as purchase}
+                <tr>
+                  <td>{purchase.name}</td>
+                  <td>{purchase.category || 'N/A'}</td>
+                  <td>
+                    <span class="badge" class:badge-reusable={purchase.reusableType === 'reusable'} class:badge-consumable={purchase.reusableType === 'consumable'}>
+                      {purchase.reusableType}
+                    </span>
+                  </td>
+                  <td>{purchase.quantityPurchased}</td>
+                  <td>{formatCurrency(purchase.cost)}</td>
+                  <td>{formatCurrency(purchase.cost / purchase.quantityPurchased)}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {/if}
+    </div>
+    
+    <div class="section">
+      <div class="section-header">
+        <h2>Inventory Usage & Remaining</h2>
         <div class="btn-group">
           <button class="btn" on:click={() => showAddUsage = true}>+ Add Usage</button>
           <button class="btn" on:click={() => showBulkAddUsage = true}>📋 Bulk Import</button>
@@ -841,13 +952,18 @@
               <tr>
                 <th>Item Name</th>
                 <th>Quantity Used</th>
+                <th>Remaining in Inventory</th>
               </tr>
             </thead>
             <tbody>
               {#each usage as usageItem}
+                {@const inventoryItem = inventory.find(i => i.itemName === usageItem.itemName)}
                 <tr>
                   <td>{usageItem.itemName}</td>
                   <td>{usageItem.quantityUsed}</td>
+                  <td class:low-stock={inventoryItem && typeof inventoryItem.remainingQuantity === 'number' && inventoryItem.remainingQuantity < 10}>
+                    {inventoryItem ? inventoryItem.remainingQuantity : 'N/A'}
+                  </td>
                 </tr>
               {/each}
             </tbody>

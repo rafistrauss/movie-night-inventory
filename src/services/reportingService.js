@@ -1,6 +1,7 @@
 import { getTotalCollected } from './attendeeService';
 import { getUsageByEvent } from './usageService';
 import { buildInventory } from './inventoryService';
+import { getExpensesByEvent } from './expenseService';
 import { dataCache } from './cacheService';
 
 export async function calculateEventCost(eventId) {
@@ -9,17 +10,17 @@ export async function calculateEventCost(eventId) {
     buildInventory()
   ]);
   
-  let totalCost = 0;
-  
+  // Calculate usage-based costs (this is the real cost for profit calculations)
+  let usageCost = 0;
   for (const usageItem of usage) {
     const inventoryItem = inventory.find(item => item.itemName === usageItem.itemName);
     if (inventoryItem && inventoryItem.costPerUnit) {
       const cost = parseFloat(inventoryItem.costPerUnit) * (usageItem.quantityUsed || 0);
-      totalCost += cost;
+      usageCost += cost;
     }
   }
   
-  return totalCost;
+  return usageCost;
 }
 
 export async function calculateEventProfit(eventId) {
@@ -49,34 +50,75 @@ export async function calculateGlobalLeftoverFunds() {
 }
 
 export async function getEventFinancialSummary(eventId) {
-  const [totalCollected, usage, inventory] = await Promise.all([
+  const [totalCollected, usage, inventory, expenses] = await Promise.all([
     getTotalCollected(eventId),
     getUsageByEvent(eventId),
-    buildInventory()
+    buildInventory(),
+    getExpensesByEvent(eventId)
   ]);
   
-  const costBreakdown = [];
-  let totalCost = 0;
+  // Build unified breakdown combining purchases and usage
+  const itemsMap = new Map();
   
+  // Add purchased items
+  for (const expense of expenses) {
+    const cost = parseFloat(expense.cost || 0);
+    const costPerUnit = cost / expense.quantityPurchased;
+    
+    itemsMap.set(expense.name, {
+      itemName: expense.name,
+      quantityPurchased: expense.quantityPurchased,
+      purchaseCost: cost,
+      purchaseCostPerUnit: costPerUnit,
+      quantityUsed: 0,
+      usageCost: 0,
+      usageCostPerUnit: 0
+    });
+  }
+  
+  // Add/update with usage data
   for (const usageItem of usage) {
     const inventoryItem = inventory.find(item => item.itemName === usageItem.itemName);
-    if (inventoryItem && inventoryItem.costPerUnit) {
-      const cost = parseFloat(inventoryItem.costPerUnit) * (usageItem.quantityUsed || 0);
-      totalCost += cost;
-      
-      costBreakdown.push({
+    const costPerUnit = inventoryItem?.costPerUnit || 0;
+    const usageCost = parseFloat(costPerUnit) * (usageItem.quantityUsed || 0);
+    
+    if (itemsMap.has(usageItem.itemName)) {
+      // Item was purchased for this event, add usage
+      const item = itemsMap.get(usageItem.itemName);
+      item.quantityUsed = usageItem.quantityUsed;
+      item.usageCost = usageCost;
+      item.usageCostPerUnit = parseFloat(costPerUnit);
+    } else {
+      // Item from inventory, not purchased for this event
+      itemsMap.set(usageItem.itemName, {
         itemName: usageItem.itemName,
+        quantityPurchased: 0,
+        purchaseCost: 0,
+        purchaseCostPerUnit: 0,
         quantityUsed: usageItem.quantityUsed,
-        costPerUnit: inventoryItem.costPerUnit,
-        totalCost: cost.toFixed(2)
+        usageCost: usageCost,
+        usageCostPerUnit: parseFloat(costPerUnit)
       });
     }
+  }
+  
+  const costBreakdown = Array.from(itemsMap.values());
+  
+  // Calculate totals
+  let totalPurchaseCost = 0;
+  let totalUsageCost = 0;
+  
+  for (const item of costBreakdown) {
+    totalPurchaseCost += item.purchaseCost;
+    totalUsageCost += item.usageCost;
   }
   
   return {
     revenue: totalCollected,
     costBreakdown,
-    totalCost: totalCost.toFixed(2),
-    profit: (totalCollected - totalCost).toFixed(2)
+    totalPurchaseCost: totalPurchaseCost.toFixed(2),
+    totalUsageCost: totalUsageCost.toFixed(2),
+    profitByPurchase: (totalCollected - totalPurchaseCost).toFixed(2),
+    profitByUsage: (totalCollected - totalUsageCost).toFixed(2)
   };
 }

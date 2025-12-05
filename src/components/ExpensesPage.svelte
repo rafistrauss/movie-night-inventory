@@ -8,6 +8,7 @@
   let loading = true;
   let showCreateForm = false;
   let editingExpense = null;
+  let filterEventId = '';
   
   let formData = {
     name: '',
@@ -97,6 +98,10 @@
     const event = events.find(e => e.id === eventId);
     return event ? event.name : 'Unknown';
   }
+  
+  $: filteredExpenses = filterEventId 
+    ? expenses.filter(e => e.eventId === filterEventId)
+    : expenses;
 </script>
 
 <style>
@@ -266,6 +271,50 @@
     color: #95a5a6;
   }
   
+  .filter-section {
+    background: white;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  
+  .filter-section label {
+    font-weight: 600;
+    color: #2c3e50;
+  }
+  
+  .filter-section select {
+    padding: 0.5rem 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    min-width: 200px;
+  }
+  
+  .filter-count {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+  }
+  
+  .form-group-highlight {
+    background: #f0f8ff;
+    padding: 1rem;
+    border-radius: 4px;
+    border: 2px solid #3498db;
+  }
+  
+  .field-help {
+    display: block;
+    margin-top: 0.25rem;
+    color: #7f8c8d;
+    font-size: 0.85rem;
+  }
+  
   .badge {
     display: inline-block;
     padding: 0.25rem 0.5rem;
@@ -426,6 +475,21 @@
   {#if loading}
     <div class="loading">Loading expenses...</div>
   {:else}
+    <div class="filter-section">
+      <label for="filterEvent">Filter by Event:</label>
+      <select id="filterEvent" bind:value={filterEventId}>
+        <option value="">All Events</option>
+        {#each events as event}
+          <option value={event.id}>{event.name}</option>
+        {/each}
+      </select>
+      {#if filterEventId}
+        <span class="filter-count">
+          Showing {filteredExpenses.length} of {expenses.length} expenses
+        </span>
+      {/if}
+    </div>
+    
     <div class="section">
       {#if expenses.length === 0}
         <div class="empty">No expenses recorded yet.</div>
@@ -440,12 +504,12 @@
                 <th>Type</th>
                 <th>Cost</th>
                 <th>Quantity</th>
-                <th>Event</th>
+                <th>Purchased For</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {#each expenses as expense}
+              {#each filteredExpenses as expense}
                 <tr>
                   <td>{expense.name}</td>
                   <td>{expense.category || 'N/A'}</td>
@@ -475,7 +539,7 @@
         
         <!-- Mobile Card View -->
         <div class="mobile-card">
-          {#each expenses as expense}
+          {#each filteredExpenses as expense}
             <div class="expense-card">
               <div class="expense-card-header">
                 <div class="expense-card-title">{expense.name}</div>
@@ -579,14 +643,15 @@
             </div>
           </div>
           
-          <div class="form-group">
-            <label for="eventId">Event *</label>
+          <div class="form-group form-group-highlight">
+            <label for="eventId">Purchased For Event *</label>
             <select id="eventId" bind:value={formData.eventId} required>
-              <option value="">Select an event...</option>
+              <option value="">Select which event this was purchased for...</option>
               {#each events as event}
                 <option value={event.id}>{event.name}</option>
               {/each}
             </select>
+            <small class="field-help">This tracks which event the expense belongs to</small>
           </div>
           
           <div class="form-group">
