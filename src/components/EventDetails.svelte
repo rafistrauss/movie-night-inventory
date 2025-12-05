@@ -3,7 +3,7 @@
   import { createEventDispatcher } from 'svelte';
   import { getEvent, updateEvent } from '../services/eventService';
   import { getAttendees, addAttendee, updateAttendee, deleteAttendee, bulkAddAttendees } from '../services/attendeeService';
-  import { getUsageByEvent, addUsage, bulkAddUsage } from '../services/usageService';
+  import { getUsageByEvent, addUsage, updateUsage, deleteUsage, bulkAddUsage } from '../services/usageService';
   import { getEventFinancialSummary } from '../services/reportingService';
   import { buildInventory, validateUsage } from '../services/inventoryService';
   import { getExpensesByEvent } from '../services/expenseService';
@@ -26,6 +26,7 @@
   let showBulkAddUsage = false;
   let showEditEvent = false;
   let showEditAttendee = false;
+  let showEditUsage = false;
   
   let newAttendee = {
     name: '',
@@ -47,6 +48,13 @@
   let newUsage = {
     itemName: '',
     quantityUsed: 0
+  };
+  
+  let editUsageData = {
+    id: '',
+    itemName: '',
+    quantityUsed: 0,
+    eventId: ''
   };
   
   let bulkAttendeesText = '';
@@ -238,6 +246,48 @@
     } catch (error) {
       console.error('Error adding usage:', error);
       alert('Error adding usage: ' + error.message);
+    }
+  }
+  
+  function openEditUsage(usageItem) {
+    editUsageData = {
+      id: usageItem.id,
+      itemName: usageItem.itemName,
+      quantityUsed: usageItem.quantityUsed
+    };
+    showEditUsage = true;
+  }
+  
+  async function handleEditUsage() {
+    try {
+      const validation = await validateUsage(editUsageData.itemName, editUsageData.quantityUsed);
+      
+      if (!validation.valid) {
+        alert(validation.message);
+        return;
+      }
+      
+      await updateUsage(eventId, editUsageData.id, {
+        itemName: editUsageData.itemName,
+        quantityUsed: editUsageData.quantityUsed
+      });
+      showEditUsage = false;
+      await loadEventData();
+    } catch (error) {
+      console.error('Error updating usage:', error);
+      alert('Error updating usage: ' + error.message);
+    }
+  }
+  
+  async function handleDeleteUsage(usageId) {
+    if (confirm('Delete this usage record? This will affect inventory and financial calculations.')) {
+      try {
+        await deleteUsage(eventId, usageId);
+        await loadEventData();
+      } catch (error) {
+        console.error('Error deleting usage:', error);
+        alert('Error deleting usage: ' + error.message);
+      }
     }
   }
   
@@ -953,6 +1003,7 @@
                 <th>Item Name</th>
                 <th>Quantity Used</th>
                 <th>Remaining in Inventory</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -963,6 +1014,16 @@
                   <td>{usageItem.quantityUsed}</td>
                   <td class:low-stock={inventoryItem && typeof inventoryItem.remainingQuantity === 'number' && inventoryItem.remainingQuantity < 10}>
                     {inventoryItem ? inventoryItem.remainingQuantity : 'N/A'}
+                  </td>
+                  <td>
+                    <div class="btn-group">
+                      <button class="btn btn-small" on:click={() => openEditUsage(usageItem)}>
+                        Edit
+                      </button>
+                      <button class="btn btn-small btn-danger" on:click={() => handleDeleteUsage(usageItem.id)}>
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               {/each}
@@ -1078,6 +1139,49 @@
               Cancel
             </button>
             <button type="submit" class="btn">Add Usage</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  {/if}
+  
+  {#if showEditUsage}
+    <div class="modal-overlay" on:click={() => showEditUsage = false}>
+      <div class="modal" on:click|stopPropagation>
+        <h2>Edit Inventory Usage</h2>
+        <form on:submit|preventDefault={handleEditUsage}>
+          <div class="form-group">
+            <label for="editItemName">Item *</label>
+            <select 
+              id="editItemName" 
+              bind:value={editUsageData.itemName} 
+              required
+            >
+              <option value="">Select an item...</option>
+              {#each inventory as item}
+                <option value={item.itemName}>
+                  {item.itemName} (Available: {item.remainingQuantity})
+                </option>
+              {/each}
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="editQuantityUsed">Quantity Used *</label>
+            <input 
+              id="editQuantityUsed" 
+              type="number" 
+              bind:value={editUsageData.quantityUsed} 
+              required 
+              min="0"
+            />
+          </div>
+          
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" on:click={() => showEditUsage = false}>
+              Cancel
+            </button>
+            <button type="submit" class="btn">Update Usage</button>
           </div>
         </form>
       </div>

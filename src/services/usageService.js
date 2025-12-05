@@ -2,10 +2,10 @@ import {
   collection, 
   addDoc, 
   getDocs,
-  query,
-  where,
   writeBatch,
-  doc
+  doc,
+  updateDoc,
+  deleteDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { invalidateCache } from './aggregationService';
@@ -20,6 +20,28 @@ export async function addUsage(eventId, usageData) {
   dataCache.invalidate('all_usage');
   invalidateCache();
   return docRef.id;
+}
+
+export async function updateUsage(eventId, usageId, usageData) {
+  const usageDocRef = doc(db, 'events', eventId, 'usage', usageId);
+  await updateDoc(usageDocRef, usageData);
+  
+  // Invalidate usage caches
+  dataCache.invalidate(`usage_${eventId}`);
+  dataCache.invalidate('all_usage');
+  dataCache.invalidate(`financialSummary_${eventId}`);
+  invalidateCache();
+}
+
+export async function deleteUsage(eventId, usageId) {
+  const usageDocRef = doc(db, 'events', eventId, 'usage', usageId);
+  await deleteDoc(usageDocRef);
+  
+  // Invalidate usage caches
+  dataCache.invalidate(`usage_${eventId}`);
+  dataCache.invalidate('all_usage');
+  dataCache.invalidate(`financialSummary_${eventId}`);
+  invalidateCache();
 }
 
 /**
