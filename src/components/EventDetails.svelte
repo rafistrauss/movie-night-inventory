@@ -62,11 +62,40 @@
       
       // Populate edit form data
       if (event) {
-        const eventDate = event.date.toDate ? event.date.toDate() : new Date(event.date);
+        let eventDate;
+        
+        try {
+          // Handle Firestore Timestamp
+          if (event.date.toDate && typeof event.date.toDate === 'function') {
+            eventDate = event.date.toDate();
+          } 
+          // Handle ISO string or date string
+          else if (typeof event.date === 'string') {
+            eventDate = new Date(event.date);
+          }
+          // Handle seconds (Firestore timestamp format)
+          else if (event.date.seconds) {
+            eventDate = new Date(event.date.seconds * 1000);
+          }
+          // Handle Date object or number
+          else {
+            eventDate = new Date(event.date);
+          }
+          
+          // Validate the date
+          if (isNaN(eventDate.getTime())) {
+            console.error('Invalid date:', event.date);
+            eventDate = new Date(); // Fallback to today
+          }
+        } catch (error) {
+          console.error('Error parsing event date:', error, event.date);
+          eventDate = new Date(); // Fallback to today
+        }
+        
         editEventData = {
-          name: event.name,
+          name: event.name || '',
           date: eventDate.toISOString().split('T')[0],
-          ticketPrice: event.ticketPrice,
+          ticketPrice: event.ticketPrice || 0,
           notes: event.notes || ''
         };
       }
