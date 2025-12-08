@@ -371,7 +371,7 @@
         }
         
         const itemName = parts[0];
-        const quantityUsed = parseInt(parts[1]);
+        const quantityUsed = parseFloat(parts[1]);
         
         if (!itemName) {
           errors.push(`Line ${i + 1}: Item name is required`);
@@ -1158,6 +1158,7 @@
               bind:value={newUsage.quantityUsed} 
               required 
               min="0"
+              step="any"
             />
           </div>
           
@@ -1266,7 +1267,8 @@
           <strong>Examples:</strong><br>
           <code>Popcorn Bags, 5</code><br>
           <code>Soda Cans, 12, Large size</code><br>
-          <code>Candy Bars, 8, Assorted flavors</code><br><br>
+          <code>Candy Bars, 8, Assorted flavors</code><br>
+          <code>M&M's, 0.5, Used half the bag</code><br><br>
           
           <strong>Available items:</strong><br>
           {#each inventory as item}
