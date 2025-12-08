@@ -1,6 +1,7 @@
 import { getAllExpenses } from './expenseService';
 import { getAllUsage } from './usageService';
 import { dataCache } from './cacheService';
+import { calculateAmortizedCosts } from './amortizationService';
 
 export async function buildInventory() {
   const cacheKey = 'inventory';
@@ -8,19 +9,24 @@ export async function buildInventory() {
   if (cached) return cached;
 
   // Fetch all data in parallel for efficiency
-  const [expenses, allUsage] = await Promise.all([
+  const [expenses, allUsage, amortizedCosts] = await Promise.all([
     getAllExpenses(),
-    getAllUsage()
+    getAllUsage(),
+    calculateAmortizedCosts()
   ]);
   
   // Build usage map for O(1) lookups instead of O(n) queries
   const usageByItem = new Map();
+  const eventsByItem = new Map(); // Track which events use each item
+  
   for (const usage of allUsage) {
     const itemName = usage.itemName;
     if (!usageByItem.has(itemName)) {
       usageByItem.set(itemName, 0);
+      eventsByItem.set(itemName, new Set());
     }
     usageByItem.set(itemName, usageByItem.get(itemName) + (usage.quantityUsed || 0));
+    eventsByItem.get(itemName).add(usage.eventId);
   }
   
   const inventoryMap = new Map();
@@ -65,13 +71,20 @@ export async function buildInventory() {
   const inventory = [];
   for (const [itemName, item] of inventoryMap) {
     const totalUsed = usageByItem.get(itemName) || 0;
-    const costPerUnit = item.initialQuantity > 0 ? item.totalCost / item.initialQuantity : 0;
+    const amortizedCost = amortizedCosts.get(itemName);
+    
+    // Use amortized cost per unit for reusable items, standard for consumables
+    const costPerUnit = amortizedCost ? amortizedCost.costPerUnit : 
+      (item.initialQuantity > 0 ? item.totalCost / item.initialQuantity : 0);
+    
+    const eventsUsed = eventsByItem.get(itemName)?.size || 0;
     
     inventory.push({
       ...item,
       quantityUsed: totalUsed,
       remainingQuantity: item.reusableType === 'reusable' ? 'N/A' : item.initialQuantity - totalUsed,
-      costPerUnit: costPerUnit.toFixed(2)
+      costPerUnit: costPerUnit.toFixed(2),
+      amortizedAcrossEvents: item.reusableType === 'reusable' ? eventsUsed : null
     });
   }
   

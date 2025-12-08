@@ -3,6 +3,7 @@ import { getAllExpenses } from './expenseService';
 import { getAllUsage } from './usageService';
 import { getTotalCollected } from './attendeeService';
 import { dataCache } from './cacheService';
+import { calculateAmortizedCosts } from './amortizationService';
 
 /**
  * Aggregates all data in a single optimized fetch
@@ -14,10 +15,11 @@ export async function aggregateAllData() {
   if (cached) return cached;
 
   // Fetch all base data in parallel
-  const [events, expenses, allUsage] = await Promise.all([
+  const [events, expenses, allUsage, amortizedCosts] = await Promise.all([
     getAllEvents(),
     getAllExpenses(),
-    getAllUsage()
+    getAllUsage(),
+    calculateAmortizedCosts()
   ]);
 
   // Build usage map for quick lookups (by item name and by event)
@@ -81,13 +83,20 @@ export async function aggregateAllData() {
   for (const [itemName, item] of inventoryMap) {
     const itemUsage = usageByItem.get(itemName) || [];
     const totalUsed = itemUsage.reduce((sum, u) => sum + (u.quantityUsed || 0), 0);
-    const costPerUnit = item.initialQuantity > 0 ? item.totalCost / item.initialQuantity : 0;
+    const amortizedCost = amortizedCosts.get(itemName);
+    
+    // Use amortized cost per unit for reusable items, standard for consumables
+    const costPerUnit = amortizedCost ? amortizedCost.costPerUnit : 
+      (item.initialQuantity > 0 ? item.totalCost / item.initialQuantity : 0);
+    
+    const eventsUsed = amortizedCost?.numEventsUsed || 0;
     
     inventory.push({
       ...item,
       quantityUsed: totalUsed,
       remainingQuantity: item.reusableType === 'reusable' ? 'N/A' : item.initialQuantity - totalUsed,
-      costPerUnit: costPerUnit.toFixed(2)
+      costPerUnit: costPerUnit.toFixed(2),
+      amortizedAcrossEvents: item.reusableType === 'reusable' ? eventsUsed : null
     });
   }
 

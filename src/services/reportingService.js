@@ -1,26 +1,16 @@
 import { getTotalCollected } from './attendeeService';
 import { getUsageByEvent } from './usageService';
-import { buildInventory } from './inventoryService';
 import { getExpensesByEvent } from './expenseService';
 import { dataCache } from './cacheService';
+import { calculateEventAmortizedCosts } from './amortizationService';
 
 export async function calculateEventCost(eventId) {
-  const [usage, inventory] = await Promise.all([
-    getUsageByEvent(eventId),
-    buildInventory()
-  ]);
+  const usage = await getUsageByEvent(eventId);
   
-  // Calculate usage-based costs (this is the real cost for profit calculations)
-  let usageCost = 0;
-  for (const usageItem of usage) {
-    const inventoryItem = inventory.find(item => item.itemName === usageItem.itemName);
-    if (inventoryItem && inventoryItem.costPerUnit) {
-      const cost = parseFloat(inventoryItem.costPerUnit) * (usageItem.quantityUsed || 0);
-      usageCost += cost;
-    }
-  }
+  // Calculate amortized costs (includes reusable item amortization)
+  const amortizedCosts = await calculateEventAmortizedCosts(eventId, usage);
   
-  return usageCost;
+  return amortizedCosts.totalCost;
 }
 
 export async function calculateEventProfit(eventId) {
@@ -50,12 +40,14 @@ export async function calculateGlobalLeftoverFunds() {
 }
 
 export async function getEventFinancialSummary(eventId) {
-  const [totalCollected, usage, inventory, expenses] = await Promise.all([
+  const [totalCollected, usage, expenses] = await Promise.all([
     getTotalCollected(eventId),
     getUsageByEvent(eventId),
-    buildInventory(),
     getExpensesByEvent(eventId)
   ]);
+  
+  // Get amortized cost calculations
+  const amortizedCosts = await calculateEventAmortizedCosts(eventId, usage);
   
   // Build unified breakdown combining purchases and usage
   const itemsMap = new Map();
@@ -72,32 +64,37 @@ export async function getEventFinancialSummary(eventId) {
       purchaseCostPerUnit: costPerUnit,
       quantityUsed: 0,
       usageCost: 0,
-      usageCostPerUnit: 0
+      usageCostPerUnit: 0,
+      isAmortized: false,
+      amortizedAcrossEvents: null
     });
   }
   
-  // Add/update with usage data
-  for (const usageItem of usage) {
-    const inventoryItem = inventory.find(item => item.itemName === usageItem.itemName);
-    const costPerUnit = inventoryItem?.costPerUnit || 0;
-    const usageCost = parseFloat(costPerUnit) * (usageItem.quantityUsed || 0);
+  // Add/update with amortized usage data
+  for (const amortizedItem of amortizedCosts.items) {
+    const costPerUnit = amortizedItem.costPerUnit;
+    const usageCost = amortizedItem.totalCost;
     
-    if (itemsMap.has(usageItem.itemName)) {
+    if (itemsMap.has(amortizedItem.itemName)) {
       // Item was purchased for this event, add usage
-      const item = itemsMap.get(usageItem.itemName);
-      item.quantityUsed = usageItem.quantityUsed;
+      const item = itemsMap.get(amortizedItem.itemName);
+      item.quantityUsed = amortizedItem.quantityUsed;
       item.usageCost = usageCost;
-      item.usageCostPerUnit = parseFloat(costPerUnit);
+      item.usageCostPerUnit = costPerUnit;
+      item.isAmortized = amortizedItem.isAmortized;
+      item.amortizedAcrossEvents = amortizedItem.amortizedAcrossEvents;
     } else {
       // Item from inventory, not purchased for this event
-      itemsMap.set(usageItem.itemName, {
-        itemName: usageItem.itemName,
+      itemsMap.set(amortizedItem.itemName, {
+        itemName: amortizedItem.itemName,
         quantityPurchased: 0,
         purchaseCost: 0,
         purchaseCostPerUnit: 0,
-        quantityUsed: usageItem.quantityUsed,
+        quantityUsed: amortizedItem.quantityUsed,
         usageCost: usageCost,
-        usageCostPerUnit: parseFloat(costPerUnit)
+        usageCostPerUnit: costPerUnit,
+        isAmortized: amortizedItem.isAmortized,
+        amortizedAcrossEvents: amortizedItem.amortizedAcrossEvents
       });
     }
   }

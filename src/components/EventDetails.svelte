@@ -774,6 +774,21 @@
     color: white;
   }
   
+  .badge-info {
+    background: #3498db;
+    color: white;
+  }
+  
+  .badge-warning {
+    background: #f39c12;
+    color: white;
+  }
+  
+  .badge-secondary {
+    background: #95a5a6;
+    color: white;
+  }
+  
   .low-stock {
     color: #e74c3c;
     font-weight: bold;
@@ -871,6 +886,7 @@
                   <th>Purchase Cost</th>
                   <th>Qty Used</th>
                   <th>Usage Cost</th>
+                  <th>Amortization</th>
                 </tr>
               </thead>
               <tbody>
@@ -881,6 +897,17 @@
                     <td>{item.purchaseCost > 0 ? formatCurrency(item.purchaseCost) : '-'}</td>
                     <td>{item.quantityUsed || '-'}</td>
                     <td>{item.usageCost > 0 ? formatCurrency(item.usageCost) : '-'}</td>
+                    <td>
+                      {#if item.isAmortized && item.amortizedAcrossEvents > 1}
+                        <span class="badge badge-info" title="Cost divided across {item.amortizedAcrossEvents} events">
+                          Shared across {item.amortizedAcrossEvents} events
+                        </span>
+                      {:else if item.isAmortized && item.amortizedAcrossEvents === 1}
+                        <span class="badge badge-warning" title="Reusable item, first use">First use (reusable)</span>
+                      {:else}
+                        <span class="badge badge-secondary">Consumable</span>
+                      {/if}
+                    </td>
                   </tr>
                 {/each}
               </tbody>

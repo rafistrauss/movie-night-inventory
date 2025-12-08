@@ -223,8 +223,11 @@
     font-weight: bold;
   }
   
-  .hide-mobile {
-    /* Hidden on mobile via media query */
+  .amortization-note {
+    color: #3498db;
+    font-weight: bold;
+    margin-left: 4px;
+    cursor: help;
   }
   
   /* Mobile Optimizations */
@@ -389,6 +392,7 @@
                 <th class="hide-mobile">Initial Quantity</th>
                 <th>Remaining</th>
                 <th>Cost/Unit</th>
+                <th class="hide-mobile">Events Used</th>
               </tr>
             </thead>
             <tbody>
@@ -400,7 +404,19 @@
                   <td class:low-stock={typeof item.remainingQuantity === 'number' && item.remainingQuantity < 10}>
                     {item.remainingQuantity}
                   </td>
-                  <td>{formatCurrency(item.costPerUnit)}</td>
+                  <td>
+                    {formatCurrency(item.costPerUnit)}
+                    {#if item.amortizedAcrossEvents && item.amortizedAcrossEvents > 1}
+                      <span class="amortization-note" title="Cost amortized across {item.amortizedAcrossEvents} events">*</span>
+                    {/if}
+                  </td>
+                  <td class="hide-mobile">
+                    {#if item.amortizedAcrossEvents}
+                      {item.amortizedAcrossEvents}
+                    {:else}
+                      -
+                    {/if}
+                  </td>
                 </tr>
               {/each}
             </tbody>
