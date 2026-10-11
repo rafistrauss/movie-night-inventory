@@ -17,16 +17,13 @@ export async function buildInventory() {
   
   // Build usage map for O(1) lookups instead of O(n) queries
   const usageByItem = new Map();
-  const eventsByItem = new Map(); // Track which events use each item
   
   for (const usage of allUsage) {
     const itemName = usage.itemName;
     if (!usageByItem.has(itemName)) {
       usageByItem.set(itemName, 0);
-      eventsByItem.set(itemName, new Set());
     }
     usageByItem.set(itemName, usageByItem.get(itemName) + (usage.quantityUsed || 0));
-    eventsByItem.get(itemName).add(usage.eventId);
   }
   
   const inventoryMap = new Map();
@@ -77,13 +74,14 @@ export async function buildInventory() {
     const costPerUnit = amortizedCost ? amortizedCost.costPerUnit : 
       (item.initialQuantity > 0 ? item.totalCost / item.initialQuantity : 0);
     
-    const eventsUsed = eventsByItem.get(itemName)?.size || 0;
+    const eventsUsed = amortizedCost?.numEventsUsed || 0;
     
     inventory.push({
       ...item,
       quantityUsed: totalUsed,
       remainingQuantity: item.reusableType === 'reusable' ? 'N/A' : item.initialQuantity - totalUsed,
       costPerUnit: costPerUnit.toFixed(2),
+      costPerEvent: amortizedCost?.costPerEvent ?? null,
       amortizedAcrossEvents: item.reusableType === 'reusable' ? eventsUsed : null
     });
   }

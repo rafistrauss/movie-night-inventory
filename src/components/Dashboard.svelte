@@ -322,7 +322,7 @@
       </div>
       
       <div class="stat-card">
-        <h3>Leftover Funds</h3>
+        <h3 title="Revenue collected minus all purchase costs. Reusing inventory does not restore spent cash.">Leftover Funds</h3>
         <div class="stat-value" class:positive={leftoverFunds >= 0} class:negative={leftoverFunds < 0}>
           {formatCurrency(leftoverFunds)}
         </div>
