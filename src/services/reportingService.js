@@ -1,8 +1,8 @@
 import { getTotalCollected } from './attendeeService';
 import { getUsageByEvent } from './usageService';
-import { getExpensesByEvent } from './expenseService';
+import { getAllExpenses } from './expenseService';
 import { dataCache } from './cacheService';
-import { calculateEventAmortizedCosts } from './amortizationService';
+import { calculateEventAmortizedCosts, getUniqueExpenses } from './amortizationService';
 
 export async function calculateEventCost(eventId) {
   const usage = await getUsageByEvent(eventId);
@@ -40,11 +40,13 @@ export async function calculateGlobalLeftoverFunds() {
 }
 
 export async function getEventFinancialSummary(eventId) {
-  const [totalCollected, usage, expenses] = await Promise.all([
+  const [totalCollected, usage, allExpenses] = await Promise.all([
     getTotalCollected(eventId),
     getUsageByEvent(eventId),
-    getExpensesByEvent(eventId)
+    getAllExpenses()
   ]);
+  // Repeated entries of a reusable item only count as a purchase once
+  const expenses = getUniqueExpenses(allExpenses).filter(expense => expense.eventId === eventId);
   
   // Get amortized cost calculations
   const amortizedCosts = await calculateEventAmortizedCosts(eventId, usage);

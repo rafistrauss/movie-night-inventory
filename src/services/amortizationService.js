@@ -1,6 +1,39 @@
 import { getAllExpenses } from './expenseService';
 import { getAllUsage } from './usageService';
 
+function getTimestamp(value) {
+  if (!value) return Infinity;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  const time = new Date(value).getTime();
+  return isNaN(time) ? Infinity : time;
+}
+
+/**
+ * Reusable items are often re-logged at every event that uses them. Those
+ * repeated entries (same name and cost) describe one purchase, so only the
+ * earliest one is kept. Purchases with a different cost are kept as real
+ * additional purchases. Consumables are returned unchanged.
+ */
+export function getUniqueExpenses(expenses) {
+  const sorted = expenses
+    .map((expense, index) => ({ expense, index }))
+    .sort((a, b) =>
+      (getTimestamp(a.expense.createdAt) - getTimestamp(b.expense.createdAt)) || (a.index - b.index)
+    );
+  const seen = new Set();
+  const keep = new Set();
+  for (const { expense } of sorted) {
+    if (expense.reusableType === 'reusable') {
+      const key = `${expense.name}\u0000${Number(expense.cost) || 0}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+    }
+    keep.add(expense);
+  }
+  return expenses.filter(expense => keep.has(expense));
+}
+
 /**
  * Calculate amortized cost per unit for an item across all events it's been used in
  * For reusable items: cost is divided by number of events used
@@ -19,7 +52,7 @@ export async function calculateAmortizedCosts() {
   const expensesByItem = new Map(); // itemName -> { totalCost, quantityPurchased, reusableType, expenses }
   
   // First, build the expense map
-  for (const expense of expenses) {
+  for (const expense of getUniqueExpenses(expenses)) {
     const itemName = expense.name;
     
     if (!expensesByItem.has(itemName)) {

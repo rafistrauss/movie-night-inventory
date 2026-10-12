@@ -137,6 +137,7 @@ Purchase: 100 popcorn bags for $20.00
 - Financial summaries reflect current amortization state
 
 ### Data Consistency
+- If a reusable item is logged as an expense again at each event (same name and cost), it is treated as a single purchase. Its cost is counted once in totals, leftover funds, and the purchase cost of the earliest event. Entries with a different cost count as additional purchases.
 - Amortization is calculated on-the-fly from usage data
 - No manual recalculation needed
 - Always reflects current state of the system
