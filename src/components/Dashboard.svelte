@@ -111,6 +111,12 @@
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   }
   
+  .stat-help {
+    margin: 0.5rem 0 0;
+    font-size: 0.8rem;
+    opacity: 0.75;
+  }
+
   .stat-card h3 {
     margin: 0 0 0.5rem 0;
     color: #7f8c8d;
@@ -322,10 +328,11 @@
       </div>
       
       <div class="stat-card">
-        <h3 title="Revenue collected minus all purchase costs. Reusing inventory does not restore spent cash.">Leftover Funds</h3>
+        <h3>Leftover Funds</h3>
         <div class="stat-value" class:positive={leftoverFunds >= 0} class:negative={leftoverFunds < 0}>
           {formatCurrency(leftoverFunds)}
         </div>
+        <p class="stat-help">Revenue collected minus all purchase costs. Reusing inventory does not restore spent cash.</p>
       </div>
       
       <div class="stat-card">

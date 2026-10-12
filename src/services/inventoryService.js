@@ -51,7 +51,12 @@ export async function buildInventory() {
     } else if (expense.reusableType === 'reusable') {
       // Reusable items don't deplete
       const key = expense.name;
-      if (!inventoryMap.has(key)) {
+      if (inventoryMap.has(key)) {
+        const existing = inventoryMap.get(key);
+        existing.initialQuantity += Number(expense.quantityPurchased) || 1;
+        existing.totalCost += Number(expense.cost) || 0;
+        existing.expenses.push(expense);
+      } else {
         inventoryMap.set(key, {
           itemName: expense.name,
           category: expense.category,

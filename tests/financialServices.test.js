@@ -128,3 +128,17 @@ test('multiple purchases of a reusable item share their combined cost', async ()
   assert.equal(await reportingService.calculateEventCost('first'), 60);
   assert.equal(await reportingService.calculateEventCost('second'), 60);
 });
+
+test('same-name purchases on one event are aggregated in reports and inventory', async () => {
+  const { reportingService, inventoryService } = await loadServices({
+    expenses: [cups, { ...cups, cost: '40', quantityPurchased: '25' }],
+    usage: [{ eventId: cups.eventId, itemName: 'Cups', quantityUsed: 10 }],
+    events: [{ id: cups.eventId }]
+  });
+  const summary = await reportingService.getEventFinancialSummary(cups.eventId);
+  assert.equal(summary.totalPurchaseCost, '120.00');
+  assert.equal(summary.costBreakdown[0].quantityPurchased, 75);
+  const item = await inventoryService.getInventoryItem('Cups');
+  assert.equal(item.totalCost, 120);
+  assert.equal(item.initialQuantity, 75);
+});
