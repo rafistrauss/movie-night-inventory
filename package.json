@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "oxlint src"
+    "lint": "oxlint src",
+    "test": "node --experimental-vm-modules --no-warnings --test tests/*.test.js"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^3.0.1",
