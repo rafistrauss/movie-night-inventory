@@ -17,16 +17,13 @@ export async function buildInventory() {
   
   // Build usage map for O(1) lookups instead of O(n) queries
   const usageByItem = new Map();
-  const eventsByItem = new Map(); // Track which events use each item
   
   for (const usage of allUsage) {
     const itemName = usage.itemName;
     if (!usageByItem.has(itemName)) {
       usageByItem.set(itemName, 0);
-      eventsByItem.set(itemName, new Set());
     }
     usageByItem.set(itemName, usageByItem.get(itemName) + (usage.quantityUsed || 0));
-    eventsByItem.get(itemName).add(usage.eventId);
   }
   
   const inventoryMap = new Map();
@@ -38,29 +35,34 @@ export async function buildInventory() {
       
       if (inventoryMap.has(key)) {
         const existing = inventoryMap.get(key);
-        existing.initialQuantity += expense.quantityPurchased || 0;
-        existing.totalCost += expense.cost || 0;
+        existing.initialQuantity += Number(expense.quantityPurchased) || 0;
+        existing.totalCost += Number(expense.cost) || 0;
         existing.expenses.push(expense);
       } else {
         inventoryMap.set(key, {
           itemName: expense.name,
           category: expense.category,
           reusableType: expense.reusableType,
-          initialQuantity: expense.quantityPurchased || 0,
-          totalCost: expense.cost || 0,
+          initialQuantity: Number(expense.quantityPurchased) || 0,
+          totalCost: Number(expense.cost) || 0,
           expenses: [expense]
         });
       }
     } else if (expense.reusableType === 'reusable') {
       // Reusable items don't deplete
       const key = expense.name;
-      if (!inventoryMap.has(key)) {
+      if (inventoryMap.has(key)) {
+        const existing = inventoryMap.get(key);
+        existing.initialQuantity += Number(expense.quantityPurchased) || 1;
+        existing.totalCost += Number(expense.cost) || 0;
+        existing.expenses.push(expense);
+      } else {
         inventoryMap.set(key, {
           itemName: expense.name,
           category: expense.category,
           reusableType: expense.reusableType,
-          initialQuantity: expense.quantityPurchased || 1,
-          totalCost: expense.cost || 0,
+          initialQuantity: Number(expense.quantityPurchased) || 1,
+          totalCost: Number(expense.cost) || 0,
           expenses: [expense]
         });
       }
@@ -77,13 +79,14 @@ export async function buildInventory() {
     const costPerUnit = amortizedCost ? amortizedCost.costPerUnit : 
       (item.initialQuantity > 0 ? item.totalCost / item.initialQuantity : 0);
     
-    const eventsUsed = eventsByItem.get(itemName)?.size || 0;
+    const eventsUsed = amortizedCost?.numEventsUsed || 0;
     
     inventory.push({
       ...item,
       quantityUsed: totalUsed,
       remainingQuantity: item.reusableType === 'reusable' ? 'N/A' : item.initialQuantity - totalUsed,
       costPerUnit: costPerUnit.toFixed(2),
+      costPerEvent: amortizedCost?.costPerEvent ?? null,
       amortizedAcrossEvents: item.reusableType === 'reusable' ? eventsUsed : null
     });
   }

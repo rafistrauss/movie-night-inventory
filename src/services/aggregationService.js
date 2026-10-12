@@ -3,7 +3,7 @@ import { getAllExpenses } from './expenseService';
 import { getAllUsage } from './usageService';
 import { getTotalCollected } from './attendeeService';
 import { dataCache } from './cacheService';
-import { calculateAmortizedCosts } from './amortizationService';
+import { calculateAmortizedCosts, calculateEventAmortizedCosts } from './amortizationService';
 
 /**
  * Aggregates all data in a single optimized fetch
@@ -51,27 +51,32 @@ export async function aggregateAllData() {
     if (expense.reusableType === 'consumable') {
       if (inventoryMap.has(key)) {
         const existing = inventoryMap.get(key);
-        existing.initialQuantity += expense.quantityPurchased || 0;
-        existing.totalCost += expense.cost || 0;
+        existing.initialQuantity += Number(expense.quantityPurchased) || 0;
+        existing.totalCost += Number(expense.cost) || 0;
         existing.expenses.push(expense);
       } else {
         inventoryMap.set(key, {
           itemName: expense.name,
           category: expense.category,
           reusableType: expense.reusableType,
-          initialQuantity: expense.quantityPurchased || 0,
-          totalCost: expense.cost || 0,
+          initialQuantity: Number(expense.quantityPurchased) || 0,
+          totalCost: Number(expense.cost) || 0,
           expenses: [expense]
         });
       }
     } else if (expense.reusableType === 'reusable') {
-      if (!inventoryMap.has(key)) {
+      if (inventoryMap.has(key)) {
+        const existing = inventoryMap.get(key);
+        existing.initialQuantity += Number(expense.quantityPurchased) || 1;
+        existing.totalCost += Number(expense.cost) || 0;
+        existing.expenses.push(expense);
+      } else {
         inventoryMap.set(key, {
           itemName: expense.name,
           category: expense.category,
           reusableType: expense.reusableType,
-          initialQuantity: expense.quantityPurchased || 1,
-          totalCost: expense.cost || 0,
+          initialQuantity: Number(expense.quantityPurchased) || 1,
+          totalCost: Number(expense.cost) || 0,
           expenses: [expense]
         });
       }
@@ -96,6 +101,7 @@ export async function aggregateAllData() {
       quantityUsed: totalUsed,
       remainingQuantity: item.reusableType === 'reusable' ? 'N/A' : item.initialQuantity - totalUsed,
       costPerUnit: costPerUnit.toFixed(2),
+      costPerEvent: amortizedCost?.costPerEvent ?? null,
       amortizedAcrossEvents: item.reusableType === 'reusable' ? eventsUsed : null
     });
   }
@@ -106,23 +112,12 @@ export async function aggregateAllData() {
       const eventUsage = usageByEvent.get(event.id) || [];
       const revenue = await getTotalCollected(event.id);
       
-      let cost = 0;
-      const costBreakdown = [];
-      
-      for (const usage of eventUsage) {
-        const inventoryItem = inventory.find(item => item.itemName === usage.itemName);
-        if (inventoryItem && inventoryItem.costPerUnit) {
-          const itemCost = parseFloat(inventoryItem.costPerUnit) * (usage.quantityUsed || 0);
-          cost += itemCost;
-          
-          costBreakdown.push({
-            itemName: usage.itemName,
-            quantityUsed: usage.quantityUsed,
-            costPerUnit: inventoryItem.costPerUnit,
-            totalCost: itemCost.toFixed(2)
-          });
-        }
-      }
+      const eventCosts = await calculateEventAmortizedCosts(event.id, eventUsage, amortizedCosts);
+      const cost = eventCosts.totalCost;
+      const costBreakdown = eventCosts.items.map(item => ({
+        ...item,
+        totalCost: item.totalCost.toFixed(2)
+      }));
       
       return {
         eventId: event.id,
@@ -136,12 +131,16 @@ export async function aggregateAllData() {
 
   // Build financial map for quick lookups
   const financialsMap = new Map();
-  let globalLeftoverFunds = 0;
+  let totalRevenue = 0;
   
   for (const financial of eventFinancials) {
     financialsMap.set(financial.eventId, financial);
-    globalLeftoverFunds += financial.profit;
+    totalRevenue += financial.revenue;
   }
+
+  // Available cash reflects actual purchases, not amortized inventory usage.
+  const totalSpending = expenses.reduce((sum, expense) => sum + (Number(expense.cost) || 0), 0);
+  const globalLeftoverFunds = totalRevenue - totalSpending;
 
   const aggregatedData = {
     events,

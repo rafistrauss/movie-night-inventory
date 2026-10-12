@@ -872,7 +872,8 @@
         
         <div class="profit-explanation">
           <strong>Profit by Purchase</strong> = Revenue - Direct Purchase Cost (what you actually spent)<br>
-          <strong>Profit by Usage</strong> = Revenue - Usage-Based Cost (accounting for inventory value consumed)
+          <strong>Profit by Usage</strong> = Revenue - Usage-Based Cost (consumables used plus an equal share of reusable costs)<br>
+          Reusable costs decrease per event as more events use them; this does not restore cash already spent.
         </div>
         
         {#if financialSummary.costBreakdown && financialSummary.costBreakdown.length > 0}

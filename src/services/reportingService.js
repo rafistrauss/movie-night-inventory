@@ -55,13 +55,23 @@ export async function getEventFinancialSummary(eventId) {
   // Add purchased items
   for (const expense of expenses) {
     const cost = parseFloat(expense.cost || 0);
-    const costPerUnit = cost / expense.quantityPurchased;
+    const quantity = Number(expense.quantityPurchased) || 0;
+    const existing = itemsMap.get(expense.name);
+    
+    if (existing) {
+      existing.quantityPurchased += quantity;
+      existing.purchaseCost += cost;
+      existing.purchaseCostPerUnit = existing.quantityPurchased > 0
+        ? existing.purchaseCost / existing.quantityPurchased
+        : 0;
+      continue;
+    }
     
     itemsMap.set(expense.name, {
       itemName: expense.name,
-      quantityPurchased: expense.quantityPurchased,
+      quantityPurchased: quantity,
       purchaseCost: cost,
-      purchaseCostPerUnit: costPerUnit,
+      purchaseCostPerUnit: quantity > 0 ? cost / quantity : 0,
       quantityUsed: 0,
       usageCost: 0,
       usageCostPerUnit: 0,

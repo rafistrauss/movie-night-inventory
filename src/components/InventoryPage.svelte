@@ -46,7 +46,18 @@
   }
   
   function getItemUsageHistory(itemName) {
-    return usageHistory.filter(usage => usage.itemName === itemName);
+    const byEvent = new Map();
+    for (const usage of usageHistory.filter(usage => usage.itemName === itemName)) {
+      const quantityUsed = Number(usage.quantityUsed) || 0;
+      if (quantityUsed <= 0) continue;
+      const existing = byEvent.get(usage.eventId);
+      if (existing) {
+        existing.quantityUsed += quantityUsed;
+      } else {
+        byEvent.set(usage.eventId, { eventId: usage.eventId, quantityUsed });
+      }
+    }
+    return Array.from(byEvent.values());
   }
   
   function getStockStatus(item) {
@@ -782,7 +793,7 @@
                 <tr>
                   <td>{usage.eventId}</td>
                   <td>{usage.quantityUsed}</td>
-                  <td>{formatCurrency(parseFloat(selectedItem.costPerUnit) * usage.quantityUsed)}</td>
+                  <td>{formatCurrency(selectedItem.reusableType === 'reusable' ? selectedItem.costPerEvent : parseFloat(selectedItem.costPerUnit) * usage.quantityUsed)}</td>
                 </tr>
               {/each}
             </tbody>

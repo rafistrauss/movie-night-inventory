@@ -34,13 +34,14 @@ export async function calculateAmortizedCosts() {
     }
     
     const item = expensesByItem.get(itemName);
-    item.totalCost += expense.cost || 0;
-    item.quantityPurchased += expense.quantityPurchased || 0;
+    item.totalCost += Number(expense.cost) || 0;
+    item.quantityPurchased += Number(expense.quantityPurchased) || 0;
     item.expenses.push(expense);
   }
   
   // Track which events use each reusable item
   for (const usage of allUsage) {
+    if (!(Number(usage.quantityUsed) > 0)) continue;
     const itemName = usage.itemName;
     const eventId = usage.eventId;
     
@@ -107,31 +108,40 @@ export async function getAmortizedCostForItem(itemName) {
  * Calculate the amortized cost attribution for a specific event
  * Returns how much each item costs for that event based on amortization
  */
-export async function calculateEventAmortizedCosts(eventId, usage) {
-  const amortizedCosts = await calculateAmortizedCosts();
+export async function calculateEventAmortizedCosts(eventId, usage, existingCosts) {
+  const amortizedCosts = existingCosts || await calculateAmortizedCosts();
   
   const eventCosts = [];
   let totalCost = 0;
+  const quantitiesByItem = new Map();
   
   for (const usageItem of usage) {
-    const itemCost = amortizedCosts.get(usageItem.itemName);
+    const quantity = Number(usageItem.quantityUsed) || 0;
+    if (quantity <= 0) continue;
+    quantitiesByItem.set(
+      usageItem.itemName,
+      (quantitiesByItem.get(usageItem.itemName) || 0) + quantity
+    );
+  }
+
+  for (const [itemName, quantityUsed] of quantitiesByItem) {
+    const itemCost = amortizedCosts.get(itemName);
     
     if (!itemCost) continue;
     
     let cost;
     if (itemCost.reusableType === 'reusable') {
-      // For reusable items, use the per-event amortized cost
-      // Multiply by quantity used (e.g., 10 cups used = 10 * costPerUnit)
-      cost = itemCost.costPerUnit * (usageItem.quantityUsed || 0);
+      // Charge one equal share per event, regardless of quantity or usage records.
+      cost = itemCost.costPerEvent;
     } else {
       // For consumable items, use standard cost per unit
-      cost = itemCost.costPerUnit * (usageItem.quantityUsed || 0);
+      cost = itemCost.costPerUnit * quantityUsed;
     }
     
     eventCosts.push({
-      itemName: usageItem.itemName,
-      quantityUsed: usageItem.quantityUsed,
-      costPerUnit: itemCost.costPerUnit,
+      itemName,
+      quantityUsed,
+      costPerUnit: cost / quantityUsed,
       totalCost: cost,
       reusableType: itemCost.reusableType,
       isAmortized: itemCost.reusableType === 'reusable',

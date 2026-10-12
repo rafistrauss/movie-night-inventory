@@ -22,6 +22,9 @@ The application now supports **automatic amortization** of reusable expenses acr
 - Cost is **amortized** across all events that use the item
 - Each event pays an equal share of the total cost
 - The more events that use it, the less each event pays
+- Quantities and multiple usage records within one event do not change that event's share
+- The full purchase cost remains recorded on the event where the item was bought
+- Dashboard **Leftover Funds** is revenue collected minus all actual purchases, including unused inventory. Amortization changes usage-based profit, not cash available to spend
 
 **Example 1: Progressive Amortization**
 - Purchase reusable cups for $30
