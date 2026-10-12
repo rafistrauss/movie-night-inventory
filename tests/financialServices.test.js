@@ -151,3 +151,38 @@ test('inventory totals stay numeric when the first purchase has string fields', 
   assert.equal(item.totalCost, 120);
   assert.equal(item.initialQuantity, 75);
 });
+
+test('re-logging a reusable item at each event does not multiply its cost', async () => {
+  const events = [{ id: 'first' }, { id: 'second' }, { id: 'third' }];
+  const projector = { name: 'Projector', reusableType: 'reusable', cost: 300, quantityPurchased: 1 };
+  const { aggregationService, reportingService, inventoryService } = await loadServices({
+    expenses: [
+      { ...projector, eventId: 'second', createdAt: new Date('2026-02-01') },
+      { ...projector, eventId: 'first', createdAt: new Date('2026-01-01') },
+      { ...projector, cost: '300', eventId: 'third', createdAt: new Date('2026-03-01') }
+    ],
+    usage: events.map(event => ({ eventId: event.id, itemName: 'Projector', quantityUsed: 1 })),
+    events,
+    revenue: { first: 300 }
+  });
+  const item = await inventoryService.getInventoryItem('Projector');
+  assert.equal(item.totalCost, 300);
+  assert.equal(item.costPerEvent, 100);
+  const data = await aggregationService.aggregateAllData();
+  assert.equal(data.inventory[0].totalCost, 300);
+  assert.equal(data.globalLeftoverFunds, 0);
+  for (const event of events) {
+    assert.equal(data.financials.get(event.id).cost, 100);
+    const summary = await reportingService.getEventFinancialSummary(event.id);
+    assert.equal(summary.totalUsageCost, '100.00');
+    assert.equal(summary.totalPurchaseCost, event.id === 'first' ? '300.00' : '0.00');
+  }
+});
+
+test('repeated consumable purchases are still all counted', async () => {
+  const napkins = { name: 'Napkins', reusableType: 'consumable', cost: 10, quantityPurchased: 100 };
+  const { inventoryService } = await loadServices({ expenses: [napkins, { ...napkins }] });
+  const item = await inventoryService.getInventoryItem('Napkins');
+  assert.equal(item.totalCost, 20);
+  assert.equal(item.initialQuantity, 200);
+});

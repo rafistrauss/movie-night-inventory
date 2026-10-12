@@ -1,7 +1,7 @@
 import { getAllExpenses } from './expenseService';
 import { getAllUsage } from './usageService';
 import { dataCache } from './cacheService';
-import { calculateAmortizedCosts } from './amortizationService';
+import { calculateAmortizedCosts, getUniqueExpenses } from './amortizationService';
 
 export async function buildInventory() {
   const cacheKey = 'inventory';
@@ -29,7 +29,7 @@ export async function buildInventory() {
   const inventoryMap = new Map();
   
   // Group consumable expenses by item name
-  for (const expense of expenses) {
+  for (const expense of getUniqueExpenses(expenses)) {
     if (expense.reusableType === 'consumable') {
       const key = expense.name;
       

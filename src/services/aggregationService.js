@@ -3,7 +3,7 @@ import { getAllExpenses } from './expenseService';
 import { getAllUsage } from './usageService';
 import { getTotalCollected } from './attendeeService';
 import { dataCache } from './cacheService';
-import { calculateAmortizedCosts, calculateEventAmortizedCosts } from './amortizationService';
+import { calculateAmortizedCosts, calculateEventAmortizedCosts, getUniqueExpenses } from './amortizationService';
 
 /**
  * Aggregates all data in a single optimized fetch
@@ -44,8 +44,9 @@ export async function aggregateAllData() {
 
   // Build inventory from expenses with pre-calculated usage
   const inventoryMap = new Map();
+  const uniqueExpenses = getUniqueExpenses(expenses);
   
-  for (const expense of expenses) {
+  for (const expense of uniqueExpenses) {
     const key = expense.name;
     
     if (expense.reusableType === 'consumable') {
@@ -139,7 +140,7 @@ export async function aggregateAllData() {
   }
 
   // Available cash reflects actual purchases, not amortized inventory usage.
-  const totalSpending = expenses.reduce((sum, expense) => sum + (Number(expense.cost) || 0), 0);
+  const totalSpending = uniqueExpenses.reduce((sum, expense) => sum + (Number(expense.cost) || 0), 0);
   const globalLeftoverFunds = totalRevenue - totalSpending;
 
   const aggregatedData = {
