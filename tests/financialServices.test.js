@@ -142,3 +142,12 @@ test('same-name purchases on one event are aggregated in reports and inventory',
   assert.equal(item.totalCost, 120);
   assert.equal(item.initialQuantity, 75);
 });
+
+test('inventory totals stay numeric when the first purchase has string fields', async () => {
+  const { inventoryService } = await loadServices({
+    expenses: [{ ...cups, cost: '40', quantityPurchased: '25' }, cups]
+  });
+  const item = await inventoryService.getInventoryItem('Cups');
+  assert.equal(item.totalCost, 120);
+  assert.equal(item.initialQuantity, 75);
+});

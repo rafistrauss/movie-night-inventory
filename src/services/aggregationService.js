@@ -51,16 +51,16 @@ export async function aggregateAllData() {
     if (expense.reusableType === 'consumable') {
       if (inventoryMap.has(key)) {
         const existing = inventoryMap.get(key);
-        existing.initialQuantity += expense.quantityPurchased || 0;
-        existing.totalCost += expense.cost || 0;
+        existing.initialQuantity += Number(expense.quantityPurchased) || 0;
+        existing.totalCost += Number(expense.cost) || 0;
         existing.expenses.push(expense);
       } else {
         inventoryMap.set(key, {
           itemName: expense.name,
           category: expense.category,
           reusableType: expense.reusableType,
-          initialQuantity: expense.quantityPurchased || 0,
-          totalCost: expense.cost || 0,
+          initialQuantity: Number(expense.quantityPurchased) || 0,
+          totalCost: Number(expense.cost) || 0,
           expenses: [expense]
         });
       }
@@ -75,8 +75,8 @@ export async function aggregateAllData() {
           itemName: expense.name,
           category: expense.category,
           reusableType: expense.reusableType,
-          initialQuantity: expense.quantityPurchased || 1,
-          totalCost: expense.cost || 0,
+          initialQuantity: Number(expense.quantityPurchased) || 1,
+          totalCost: Number(expense.cost) || 0,
           expenses: [expense]
         });
       }
