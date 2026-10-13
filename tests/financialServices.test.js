@@ -186,3 +186,18 @@ test('repeated consumable purchases are still all counted', async () => {
   assert.equal(item.totalCost, 20);
   assert.equal(item.initialQuantity, 200);
 });
+
+test('reusable inventory cost per unit is the purchase price, not amortized per event', async () => {
+  const events = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];
+  const { aggregationService, inventoryService } = await loadServices({
+    expenses: [{ name: 'Bowls', reusableType: 'reusable', cost: 4.5, quantityPurchased: 3, eventId: 'a' }],
+    usage: events.map(event => ({ eventId: event.id, itemName: 'Bowls', quantityUsed: 3 })),
+    events
+  });
+  const item = await inventoryService.getInventoryItem('Bowls');
+  assert.equal(item.totalCost, 4.5);
+  assert.equal(item.costPerUnit, '1.50');
+  assert.equal(item.costPerEvent, 1.125);
+  const data = await aggregationService.aggregateAllData();
+  assert.equal(data.inventory[0].costPerUnit, '1.50');
+});

@@ -91,9 +91,8 @@ export async function aggregateAllData() {
     const totalUsed = itemUsage.reduce((sum, u) => sum + (u.quantityUsed || 0), 0);
     const amortizedCost = amortizedCosts.get(itemName);
     
-    // Use amortized cost per unit for reusable items, standard for consumables
-    const costPerUnit = amortizedCost ? amortizedCost.costPerUnit : 
-      (item.initialQuantity > 0 ? item.totalCost / item.initialQuantity : 0);
+    // Inventory shows the purchase price per unit; per-event amortization is in costPerEvent
+    const costPerUnit = item.initialQuantity > 0 ? item.totalCost / item.initialQuantity : 0;
     
     const eventsUsed = amortizedCost?.numEventsUsed || 0;
     

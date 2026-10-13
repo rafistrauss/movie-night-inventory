@@ -413,9 +413,6 @@
                   </td>
                   <td>
                     {formatCurrency(item.costPerUnit)}
-                    {#if item.amortizedAcrossEvents && item.amortizedAcrossEvents > 1}
-                      <span class="amortization-note" title="Cost amortized across {item.amortizedAcrossEvents} events">*</span>
-                    {/if}
                   </td>
                   <td class="hide-mobile">
                     {#if item.amortizedAcrossEvents}
