@@ -8,6 +8,7 @@ async function isOutdated() {
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return false;
     const { buildId } = await res.json();
+    console.info("buildId:", buildId)
     return buildId !== __BUILD_ID__;
   } catch {
     return false;
