@@ -14,9 +14,10 @@
   let filterCategory = 'all';
   let sortBy = 'name';
   let sortDirection = 'asc';
+  let hideZero = true;
   
   $: categories = [...new Set(inventory.map(item => item.category).filter(Boolean))].sort();
-  $: filteredAndSortedInventory = filterAndSortInventory(inventory, searchTerm, filterType, filterCategory, sortBy, sortDirection);
+  $: filteredAndSortedInventory = filterAndSortInventory(inventory, searchTerm, filterType, filterCategory, sortBy, sortDirection, hideZero);
   
   onMount(async () => {
     await loadInventory();
@@ -69,8 +70,12 @@
     return 'good';
   }
   
-  function filterAndSortInventory(items, search, type, category, sort, direction) {
+  function filterAndSortInventory(items, search, type, category, sort, direction, hideEmpty) {
     let filtered = items;
+
+    if (hideEmpty) {
+      filtered = filtered.filter(item => item.remainingQuantity !== 0);
+    }
     
     // Filter by search term
     if (search) {
@@ -322,8 +327,9 @@
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     margin-bottom: 1.5rem;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem 1.25rem;
+    align-items: end;
     width: 100%;
     box-sizing: border-box;
   }
@@ -333,19 +339,95 @@
     flex-direction: column;
   }
   
+  .search-group {
+    grid-column: 1 / -1;
+  }
+  
   .filter-group label {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 500;
     color: #2c3e50;
     margin-bottom: 0.5rem;
   }
   
-  .filter-group input,
+  .filter-group input[type="text"],
   .filter-group select {
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid #d5dbe0;
+    border-radius: 6px;
     font-size: 1rem;
+    background: white;
+  }
+  
+  .filter-group input[type="text"]:focus,
+  .filter-group select:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52,152,219,0.2);
+  }
+  
+  .toggle-group {
+    justify-content: flex-end;
+  }
+  
+  .filter-group .switch {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0;
+    height: 2.4rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  
+  .switch input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  
+  .slider {
+    position: relative;
+    flex: none;
+    width: 40px;
+    height: 22px;
+    background: #cbd5db;
+    border-radius: 11px;
+    transition: background 0.2s;
+  }
+  
+  .slider::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+  
+  .switch input:checked + .slider {
+    background: #3498db;
+  }
+  
+  .switch input:checked + .slider::after {
+    transform: translateX(18px);
+  }
+  
+  .switch input:focus-visible + .slider {
+    outline: 2px solid #2980b9;
+    outline-offset: 2px;
+  }
+  
+  .switch-text {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #2c3e50;
   }
   
   .results-count {
@@ -577,7 +659,7 @@
     <div class="loading">Loading inventory...</div>
   {:else}
     <div class="filters">
-      <div class="filter-group">
+      <div class="filter-group search-group">
         <label for="search">Search</label>
         <input 
           id="search"
@@ -604,6 +686,14 @@
             <option value={category}>{category}</option>
           {/each}
         </select>
+      </div>
+      
+      <div class="filter-group toggle-group">
+        <label class="switch">
+          <input type="checkbox" bind:checked={hideZero} />
+          <span class="slider"></span>
+          <span class="switch-text">Hide items with 0 remaining</span>
+        </label>
       </div>
       
       <div class="filter-group">
