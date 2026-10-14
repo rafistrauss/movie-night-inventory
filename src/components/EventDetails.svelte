@@ -16,6 +16,8 @@
   let attendees = [];
   let usage = [];
   let inventory = [];
+  // Hide consumables that are out of stock when picking items to use
+  $: availableInventory = inventory.filter(item => item.remainingQuantity !== 0);
   let financialSummary = null;
   let purchases = [];
   let loading = true;
@@ -1143,7 +1145,7 @@
               required
             >
               <option value="">Select an item...</option>
-              {#each inventory as item}
+              {#each availableInventory as item}
                 <option value={item.itemName}>
                   {item.itemName} (Available: {item.remainingQuantity})
                 </option>
@@ -1186,7 +1188,7 @@
               required
             >
               <option value="">Select an item...</option>
-              {#each inventory as item}
+              {#each inventory.filter(item => item.remainingQuantity !== 0 || item.itemName === editUsageData.itemName) as item}
                 <option value={item.itemName}>
                   {item.itemName} (Available: {item.remainingQuantity})
                 </option>
@@ -1270,7 +1272,7 @@
           <code>Candy Bars, 8, Assorted flavors</code><br><br>
           
           <strong>Available items:</strong><br>
-          {#each inventory as item}
+          {#each availableInventory as item}
             <code>{item.itemName}</code> (Available: {item.remainingQuantity})<br>
           {/each}
         </div>
