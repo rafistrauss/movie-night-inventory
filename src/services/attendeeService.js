@@ -92,7 +92,7 @@ export async function getAttendees(eventId) {
     ...doc.data()
   }));
   
-  dataCache.set(cacheKey, attendees);
+  dataCache.set(cacheKey, attendees, tenant);
   return attendees;
 }
 

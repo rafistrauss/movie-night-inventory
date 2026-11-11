@@ -61,7 +61,7 @@ export async function getAllExpenses() {
     ...doc.data()
   }));
   
-  dataCache.set(cacheKey, expenses);
+  dataCache.set(cacheKey, expenses, tenant);
   return expenses;
 }
 
@@ -78,6 +78,6 @@ export async function getExpensesByEvent(eventId) {
     ...doc.data()
   }));
   
-  dataCache.set(cacheKey, expenses);
+  dataCache.set(cacheKey, expenses, tenant);
   return expenses;
 }

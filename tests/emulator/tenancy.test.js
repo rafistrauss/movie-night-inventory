@@ -102,7 +102,7 @@ async function loadApplication(db) {
   return {
     services: entry.namespace,
     async switchTo(uid) {
-      beforeAuth();
+      beforeAuth(uid ? { uid } : null);
       auth.currentUser = uid ? { uid } : null;
       authChanged(auth.currentUser);
     },
@@ -211,4 +211,29 @@ test('temporary migration rules keep owner reads and freeze every client write',
     await assertFails(firestore.setDoc(firestore.doc(owner, 'users/owner/events/e'), {}));
     await assertFails(firestore.setDoc(firestore.doc(other, 'users/other/events/e'), {}));
   } finally { await freeze.cleanup(); }
+});
+
+test('migration rejects maps impersonating references in preflight and final verification', async () => {
+  await env.clearFirestore();
+  await admin.doc('events/e').set({ name: 'Original' });
+  await admin.doc('expenses/x').set({ nested: [{ eventRef: admin.doc('events/e') }] });
+  const impostor = { nested: [{ eventRef: { reference: 'users/owner/events/e' } }] };
+  await admin.doc('users/owner/expenses/x').set(impostor);
+  const options = { uid: 'owner', apply: true, log() {} };
+  await assert.rejects(migrate(admin, options), /Conflict: users\/owner\/expenses\/x/);
+  assert.equal((await admin.doc('users/owner/events/e').get()).exists, false);
+  await admin.doc('users/owner/expenses/x').delete();
+  // Change a correctly copied reference to a map after transactions complete.
+  const tampered = {
+    listCollections: () => admin.listCollections(),
+    doc: path => admin.doc(path),
+    async runTransaction(callback) {
+      const result = await admin.runTransaction(callback);
+      if ((await admin.doc('users/owner/expenses/x').get()).exists) {
+        await admin.doc('users/owner/expenses/x').set(impostor);
+      }
+      return result;
+    }
+  };
+  await assert.rejects(migrate(tampered, options), /Verification failed: users\/owner\/expenses\/x/);
 });

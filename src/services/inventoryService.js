@@ -92,7 +92,7 @@ export async function buildInventory() {
     });
   }
   
-  dataCache.set(cacheKey, inventory);
+  dataCache.set(cacheKey, inventory, tenant);
   return inventory;
 }
 

@@ -12,8 +12,13 @@ export function remap(value, db, uid, roots) {
   return value;
 }
 
+// A private prototype prevents stored maps from impersonating references.
+class ComparableReference {
+  constructor(path) { this.path = path; }
+}
+
 function comparable(value) {
-  if (value && typeof value.path === 'string' && typeof value.get === 'function') return { reference: value.path };
+  if (value && typeof value.path === 'string' && typeof value.get === 'function') return new ComparableReference(value.path);
   if (Array.isArray(value)) return value.map(comparable);
   if (value && Object.getPrototypeOf(value) === Object.prototype) {
     return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, comparable(item)]));

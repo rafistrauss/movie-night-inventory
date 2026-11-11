@@ -92,7 +92,7 @@ export async function getUsageByEvent(eventId) {
     ...doc.data()
   }));
   
-  dataCache.set(cacheKey, usage);
+  dataCache.set(cacheKey, usage, tenant);
   return usage;
 }
 
@@ -127,6 +127,6 @@ export async function getAllUsage() {
     });
   }
   
-  dataCache.set(cacheKey, allUsage);
+  dataCache.set(cacheKey, allUsage, tenant);
   return allUsage;
 }

@@ -15,7 +15,9 @@ function activate(uid, ready) {
 }
 
 // Clear the rendered tenant before Firebase commits an account transition.
-beforeAuthStateChanged(auth, () => activate(null, false));
+beforeAuthStateChanged(auth, user => {
+  if ((user?.uid ?? null) !== (auth.currentUser?.uid ?? null)) activate(null, false);
+});
 onAuthStateChanged(auth, user => activate(user?.uid ?? null, true));
 
 export const captureTenant = () => session.capture();

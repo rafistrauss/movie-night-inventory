@@ -12,8 +12,10 @@ class DataCache {
 
   key(key) { return `${captureTenant().uid}:${key}`; }
 
-  set(key, value) {
-    this.cache.set(this.key(key), { value, timestamp: Date.now() });
+  set(key, value, tenant) {
+    // Validate the originating generation at the write, after any await boundary.
+    tenant.assertActive();
+    this.cache.set(`${tenant.uid}:${key}`, { value, timestamp: Date.now() });
   }
 
   get(key) {

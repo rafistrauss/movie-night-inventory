@@ -39,7 +39,7 @@ export async function calculateGlobalLeftoverFunds() {
   const { aggregateAllData } = await tenant.wait(() => import('./aggregationService'));
   const data = await tenant.wait(() => aggregateAllData());
   
-  dataCache.set(cacheKey, data.globalLeftoverFunds);
+  dataCache.set(cacheKey, data.globalLeftoverFunds, tenant);
   return data.globalLeftoverFunds;
 }
 

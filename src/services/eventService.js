@@ -75,7 +75,7 @@ export async function getEvent(eventId) {
   const eventSnap = await tenant.wait(() => getDoc(eventRef));
   if (eventSnap.exists()) {
     const event = { id: eventSnap.id, ...eventSnap.data() };
-    dataCache.set(cacheKey, event);
+    dataCache.set(cacheKey, event, tenant);
     return event;
   }
   return null;
@@ -94,6 +94,6 @@ export async function getAllEvents() {
     ...doc.data()
   }));
   
-  dataCache.set(cacheKey, events);
+  dataCache.set(cacheKey, events, tenant);
   return events;
 }

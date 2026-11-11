@@ -156,7 +156,7 @@ export async function aggregateAllData() {
     timestamp: Date.now()
   };
 
-  dataCache.set(cacheKey, aggregatedData);
+  dataCache.set(cacheKey, aggregatedData, tenant);
   return aggregatedData;
 }
 
