@@ -1,3 +1,4 @@
+import { captureTenant } from './tenantService';
 import { getAllEvents } from './eventService';
 import { getAllExpenses } from './expenseService';
 import { getAllUsage } from './usageService';
@@ -10,17 +11,18 @@ import { calculateAmortizedCosts, calculateEventAmortizedCosts, getUniqueExpense
  * Reduces Firebase queries from O(n²) to O(n)
  */
 export async function aggregateAllData() {
+  const tenant = captureTenant();
   const cacheKey = 'aggregated_data';
   const cached = dataCache.get(cacheKey);
   if (cached) return cached;
 
   // Fetch all base data in parallel
-  const [events, expenses, allUsage, amortizedCosts] = await Promise.all([
+  const [events, expenses, allUsage, amortizedCosts] = await tenant.wait(() => Promise.all([
     getAllEvents(),
     getAllExpenses(),
     getAllUsage(),
     calculateAmortizedCosts()
-  ]);
+  ]));
 
   // Build usage map for quick lookups (by item name and by event)
   const usageByItem = new Map();
@@ -107,12 +109,12 @@ export async function aggregateAllData() {
   }
 
   // Pre-calculate event financials in parallel
-  const eventFinancials = await Promise.all(
+  const eventFinancials = await tenant.wait(() => Promise.all(
     events.map(async (event) => {
       const eventUsage = usageByEvent.get(event.id) || [];
-      const revenue = await getTotalCollected(event.id);
+      const revenue = await tenant.wait(() => getTotalCollected(event.id));
       
-      const eventCosts = await calculateEventAmortizedCosts(event.id, eventUsage, amortizedCosts);
+      const eventCosts = await tenant.wait(() => calculateEventAmortizedCosts(event.id, eventUsage, amortizedCosts));
       const cost = eventCosts.totalCost;
       const costBreakdown = eventCosts.items.map(item => ({
         ...item,
@@ -127,7 +129,7 @@ export async function aggregateAllData() {
         costBreakdown
       };
     })
-  );
+  ));
 
   // Build financial map for quick lookups
   const financialsMap = new Map();
@@ -162,7 +164,8 @@ export async function aggregateAllData() {
  * Get dashboard data (optimized single fetch)
  */
 export async function getDashboardData() {
-  const data = await aggregateAllData();
+  const tenant = captureTenant();
+  const data = await tenant.wait(() => aggregateAllData());
   
   return {
     events: data.events,
@@ -178,7 +181,8 @@ export async function getDashboardData() {
  * Get inventory data (optimized single fetch)
  */
 export async function getInventoryData() {
-  const data = await aggregateAllData();
+  const tenant = captureTenant();
+  const data = await tenant.wait(() => aggregateAllData());
   
   return {
     inventory: data.inventory,
@@ -190,7 +194,8 @@ export async function getInventoryData() {
  * Get event financial summary (optimized lookup)
  */
 export async function getEventFinancialData(eventId) {
-  const data = await aggregateAllData();
+  const tenant = captureTenant();
+  const data = await tenant.wait(() => aggregateAllData());
   
   return {
     financial: data.financials.get(eventId) || {

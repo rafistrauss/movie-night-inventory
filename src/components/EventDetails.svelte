@@ -1,4 +1,7 @@
 <script>
+  import { captureTenant } from '../services/tenantService';
+  const tenant = captureTenant();
+
   import { onMount } from 'svelte';
   import { createEventDispatcher } from 'svelte';
   import { getEvent, updateEvent } from '../services/eventService';
@@ -71,19 +74,19 @@
   
   let syncing = false;
   
-  onMount(async () => {
-    await loadEventData();
+  onMount(() => {
+    void loadEventData();
   });
   
   async function loadEventData() {
     try {
       loading = true;
-      event = await getEvent(eventId);
-      attendees = await getAttendees(eventId);
-      usage = await getUsageByEvent(eventId);
-      inventory = await buildInventory();
-      financialSummary = await getEventFinancialSummary(eventId);
-      purchases = await getExpensesByEvent(eventId);
+      event = await tenant.wait(() => getEvent(eventId));
+      attendees = await tenant.wait(() => getAttendees(eventId));
+      usage = await tenant.wait(() => getUsageByEvent(eventId));
+      inventory = await tenant.wait(() => buildInventory());
+      financialSummary = await tenant.wait(() => getEventFinancialSummary(eventId));
+      purchases = await tenant.wait(() => getExpensesByEvent(eventId));
       
       // Populate edit form data
       if (event) {
@@ -125,6 +128,7 @@
         };
       }
     } catch (error) {
+      if (!tenant.isActive()) return;
       console.error('Error loading event data:', error);
     } finally {
       loading = false;
@@ -138,7 +142,7 @@
       syncing = true;
       
       // Import and clear the cache before fetching fresh data
-      const { dataCache } = await import('../services/cacheService');
+      const { dataCache } = await tenant.wait(() => import('../services/cacheService'));
       console.log('Clearing cache for event:', eventId);
       dataCache.invalidate(`attendees_${eventId}`);
       dataCache.invalidate(`usage_${eventId}`);
@@ -146,27 +150,28 @@
       dataCache.invalidate(`expenses_${eventId}`);
       
       console.log('Fetching attendees for event:', eventId);
-      const newAttendees = await getAttendees(eventId);
+      const newAttendees = await tenant.wait(() => getAttendees(eventId));
       console.log('Received attendees:', newAttendees);
       attendees = [...newAttendees];
       
       console.log('Fetching usage...');
-      const newUsage = await getUsageByEvent(eventId);
+      const newUsage = await tenant.wait(() => getUsageByEvent(eventId));
       console.log('Received usage:', newUsage);
       usage = [...newUsage];
       
       console.log('Fetching financial summary...');
-      const newFinancialSummary = await getEventFinancialSummary(eventId);
+      const newFinancialSummary = await tenant.wait(() => getEventFinancialSummary(eventId));
       console.log('Received financial summary:', newFinancialSummary);
       financialSummary = { ...newFinancialSummary };
       
       console.log('Fetching purchases...');
-      const newPurchases = await getExpensesByEvent(eventId);
+      const newPurchases = await tenant.wait(() => getExpensesByEvent(eventId));
       console.log('Received purchases:', newPurchases);
       purchases = [...newPurchases];
       
       console.log('Re-sync complete! Attendees count:', attendees.length);
     } catch (error) {
+      if (!tenant.isActive()) return;
       console.error('Error re-syncing data:', error);
       alert('Error re-syncing data: ' + error.message);
     } finally {
@@ -176,11 +181,12 @@
   
   async function handleAddAttendee() {
     try {
-      await addAttendee(eventId, newAttendee);
+      await tenant.wait(() => addAttendee(eventId, newAttendee));
       newAttendee = { name: '', paidAmount: 0, paymentMethod: '', checkedIn: false, notes: '' };
       showAddAttendee = false;
-      await loadEventData();
+      await tenant.wait(() => loadEventData());
     } catch (error) {
+      if (!tenant.isActive()) return;
       console.error('Error adding attendee:', error);
       alert('Error adding attendee: ' + error.message);
     }
@@ -201,10 +207,11 @@
   async function handleEditAttendee() {
     try {
       const { id, ...attendeeData } = editAttendeeData;
-      await updateAttendee(eventId, id, attendeeData);
+      await tenant.wait(() => updateAttendee(eventId, id, attendeeData));
       showEditAttendee = false;
-      await loadEventData();
+      await tenant.wait(() => loadEventData());
     } catch (error) {
+      if (!tenant.isActive()) return;
       console.error('Error updating attendee:', error);
       alert('Error updating attendee: ' + error.message);
     }
@@ -212,9 +219,10 @@
   
   async function handleToggleCheckIn(attendee) {
     try {
-      await updateAttendee(eventId, attendee.id, { checkedIn: !attendee.checkedIn });
-      await loadEventData();
+      await tenant.wait(() => updateAttendee(eventId, attendee.id, { checkedIn: !attendee.checkedIn }));
+      await tenant.wait(() => loadEventData());
     } catch (error) {
+      if (!tenant.isActive()) return;
       console.error('Error updating attendee:', error);
       alert('Error updating attendee: ' + error.message);
     }
@@ -223,9 +231,10 @@
   async function handleDeleteAttendee(attendeeId) {
     if (confirm('Delete this attendee?')) {
       try {
-        await deleteAttendee(eventId, attendeeId);
-        await loadEventData();
+        await tenant.wait(() => deleteAttendee(eventId, attendeeId));
+        await tenant.wait(() => loadEventData());
       } catch (error) {
+        if (!tenant.isActive()) return;
         console.error('Error deleting attendee:', error);
         alert('Error deleting attendee: ' + error.message);
       }
@@ -234,18 +243,19 @@
   
   async function handleAddUsage() {
     try {
-      const validation = await validateUsage(newUsage.itemName, newUsage.quantityUsed);
+      const validation = await tenant.wait(() => validateUsage(newUsage.itemName, newUsage.quantityUsed));
       
       if (!validation.valid) {
         alert(validation.message);
         return;
       }
       
-      await addUsage(eventId, newUsage);
+      await tenant.wait(() => addUsage(eventId, newUsage));
       newUsage = { itemName: '', quantityUsed: 0 };
       showAddUsage = false;
-      await loadEventData();
+      await tenant.wait(() => loadEventData());
     } catch (error) {
+      if (!tenant.isActive()) return;
       console.error('Error adding usage:', error);
       alert('Error adding usage: ' + error.message);
     }
@@ -262,20 +272,21 @@
   
   async function handleEditUsage() {
     try {
-      const validation = await validateUsage(editUsageData.itemName, editUsageData.quantityUsed);
+      const validation = await tenant.wait(() => validateUsage(editUsageData.itemName, editUsageData.quantityUsed));
       
       if (!validation.valid) {
         alert(validation.message);
         return;
       }
       
-      await updateUsage(eventId, editUsageData.id, {
+      await tenant.wait(() => updateUsage(eventId, editUsageData.id, {
         itemName: editUsageData.itemName,
         quantityUsed: editUsageData.quantityUsed
-      });
+      }));
       showEditUsage = false;
-      await loadEventData();
+      await tenant.wait(() => loadEventData());
     } catch (error) {
+      if (!tenant.isActive()) return;
       console.error('Error updating usage:', error);
       alert('Error updating usage: ' + error.message);
     }
@@ -284,9 +295,10 @@
   async function handleDeleteUsage(usageId) {
     if (confirm('Delete this usage record? This will affect inventory and financial calculations.')) {
       try {
-        await deleteUsage(eventId, usageId);
-        await loadEventData();
+        await tenant.wait(() => deleteUsage(eventId, usageId));
+        await tenant.wait(() => loadEventData());
       } catch (error) {
+        if (!tenant.isActive()) return;
         console.error('Error deleting usage:', error);
         alert('Error deleting usage: ' + error.message);
       }
@@ -340,12 +352,13 @@
         return;
       }
       
-      await bulkAddAttendees(eventId, attendeesData);
+      await tenant.wait(() => bulkAddAttendees(eventId, attendeesData));
       bulkAttendeesText = '';
       showBulkAddAttendees = false;
-      await loadEventData();
+      await tenant.wait(() => loadEventData());
       alert(`Successfully added ${attendeesData.length} attendees!`);
     } catch (error) {
+      if (!tenant.isActive()) return;
       console.error('Error bulk adding attendees:', error);
       alert('Error bulk adding attendees: ' + error.message);
     }
@@ -386,7 +399,7 @@
         }
         
         // Validate against inventory
-        const validation = await validateUsage(itemName, quantityUsed);
+        const validation = await tenant.wait(() => validateUsage(itemName, quantityUsed));
         if (!validation.valid) {
           errors.push(`Line ${i + 1}: ${validation.message}`);
           continue;
@@ -409,12 +422,13 @@
         return;
       }
       
-      await bulkAddUsage(eventId, usageData);
+      await tenant.wait(() => bulkAddUsage(eventId, usageData));
       bulkUsageText = '';
       showBulkAddUsage = false;
-      await loadEventData();
+      await tenant.wait(() => loadEventData());
       alert(`Successfully added ${usageData.length} usage records!`);
     } catch (error) {
+      if (!tenant.isActive()) return;
       console.error('Error bulk adding usage:', error);
       alert('Error bulk adding usage: ' + error.message);
     }
@@ -422,10 +436,11 @@
   
   async function handleEditEvent() {
     try {
-      await updateEvent(eventId, editEventData);
+      await tenant.wait(() => updateEvent(eventId, editEventData));
       showEditEvent = false;
-      await loadEventData();
+      await tenant.wait(() => loadEventData());
     } catch (error) {
+      if (!tenant.isActive()) return;
       console.error('Error updating event:', error);
       alert('Error updating event: ' + error.message);
     }

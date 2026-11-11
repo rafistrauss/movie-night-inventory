@@ -167,3 +167,12 @@ Provided as-is for educational and personal use.
 ---
 
 **Ready to get started?** Head to [QUICK_START.md](QUICK_START.md) for step-by-step instructions! 🍿🎬
+
+## Multi-tenant data and migration
+
+Each Firebase user now has a private `users/{uid}` subtree. New users start empty;
+existing shared data requires an explicit Admin migration to the original owner's
+UID before rollout. See [tenant architecture, testing, exact migration commands,
+and deployment/rollback procedures](docs/TENANCY.md). Application deployment is
+manual so migration can be verified before release. Never deploy the new app or
+final rules over unmigrated production data.

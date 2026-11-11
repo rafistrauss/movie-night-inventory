@@ -1,4 +1,7 @@
 <script>
+  import { captureTenant } from '../services/tenantService';
+  const tenant = captureTenant();
+
   import { onMount } from 'svelte';
   import { createEventDispatcher } from 'svelte';
   import { getDashboardData } from '../services/aggregationService';
@@ -11,20 +14,21 @@
   let lowStockItems = 0;
   let loading = true;
   
-  onMount(async () => {
-    await loadData();
+  onMount(() => {
+    void loadData();
   });
   
   async function loadData() {
     try {
       loading = true;
       // Single optimized fetch instead of 3 separate calls
-      const data = await getDashboardData();
+      const data = await tenant.wait(() => getDashboardData());
       events = data.events;
       leftoverFunds = data.leftoverFunds;
       inventory = data.inventory;
       lowStockItems = data.lowStockItems;
     } catch (error) {
+      if (!tenant.isActive()) return;
       console.error('Error loading dashboard data:', error);
     } finally {
       loading = false;

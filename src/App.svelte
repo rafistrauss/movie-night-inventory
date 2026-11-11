@@ -1,14 +1,15 @@
 <script>
   import { onMount } from 'svelte';
   import { auth } from './firebase';
-  import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
+  import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
   import Dashboard from './components/Dashboard.svelte';
   import EventsList from './components/EventsList.svelte';
   import EventDetails from './components/EventDetails.svelte';
   import ExpensesPage from './components/ExpensesPage.svelte';
   import InventoryPage from './components/InventoryPage.svelte';
   
-  let user = null;
+  import { tenantState } from './services/tenantService';
+  $: user = $tenantState.uid ? auth.currentUser : null;
   let currentView = 'dashboard';
   let selectedEventId = null;
   let email = '';
@@ -16,18 +17,16 @@
   let loginError = '';
   
   onMount(() => {
-    onAuthStateChanged(auth, (authUser) => {
-      user = authUser;
-      if (authUser) {
-        // Initialize route from URL
-        updateViewFromUrl();
-        
-        // Handle browser back/forward
-        window.addEventListener('popstate', updateViewFromUrl);
-      }
-    });
+    window.addEventListener('popstate', updateViewFromUrl);
+    return () => window.removeEventListener('popstate', updateViewFromUrl);
   });
-  
+
+  $: if ($tenantState.generation) {
+    currentView = 'dashboard';
+    selectedEventId = null;
+    if ($tenantState.uid) updateViewFromUrl();
+  }
+
   function updateViewFromUrl() {
     const hash = window.location.hash.slice(1) || 'dashboard';
     const parts = hash.split('/');
@@ -264,7 +263,9 @@
 </style>
 
 <div class="app">
-  {#if !user}
+  {#if !$tenantState.ready}
+    <p role="status">Loading account…</p>
+  {:else if !user}
     <div class="login-container">
       <div class="login-box">
         <h1>🎬 Movie Night Tracker</h1>
@@ -332,6 +333,7 @@
       </div>
     </nav>
     
+    {#key $tenantState.generation}
     <main>
       {#if currentView === 'dashboard'}
         <Dashboard on:navigate={(e) => navigate(e.detail.view, e.detail.eventId)} />
@@ -345,5 +347,6 @@
         <InventoryPage />
       {/if}
     </main>
+    {/key}
   {/if}
 </div>

@@ -1,4 +1,7 @@
 <script>
+  import { captureTenant } from '../services/tenantService';
+  const tenant = captureTenant();
+
   import { onMount } from 'svelte';
   import { getAllExpenses, createExpense, updateExpense, deleteExpense } from '../services/expenseService';
   import { getAllEvents } from '../services/eventService';
@@ -20,18 +23,19 @@
     notes: ''
   };
   
-  onMount(async () => {
-    await loadData();
+  onMount(() => {
+    void loadData();
   });
   
   async function loadData() {
     try {
       loading = true;
-      [expenses, events] = await Promise.all([
+      [expenses, events] = await tenant.wait(() => Promise.all([
         getAllExpenses(),
         getAllEvents()
-      ]);
+      ]));
     } catch (error) {
+      if (!tenant.isActive()) return;
       console.error('Error loading data:', error);
     } finally {
       loading = false;
@@ -65,14 +69,15 @@
   async function handleSubmit() {
     try {
       if (editingExpense) {
-        await updateExpense(editingExpense.id, formData);
+        await tenant.wait(() => updateExpense(editingExpense.id, formData));
       } else {
-        await createExpense(formData);
+        await tenant.wait(() => createExpense(formData));
       }
       showCreateForm = false;
       resetForm();
-      await loadData();
+      await tenant.wait(() => loadData());
     } catch (error) {
+      if (!tenant.isActive()) return;
       console.error('Error saving expense:', error);
       alert('Error saving expense: ' + error.message);
     }
@@ -81,9 +86,10 @@
   async function handleDelete(expenseId) {
     if (confirm('Delete this expense? This will affect inventory calculations.')) {
       try {
-        await deleteExpense(expenseId);
-        await loadData();
+        await tenant.wait(() => deleteExpense(expenseId));
+        await tenant.wait(() => loadData());
       } catch (error) {
+        if (!tenant.isActive()) return;
         console.error('Error deleting expense:', error);
         alert('Error deleting expense: ' + error.message);
       }

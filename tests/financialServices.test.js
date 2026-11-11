@@ -6,6 +6,7 @@ import { SourceTextModule, SyntheticModule, createContext } from 'node:vm';
 async function loadServices({ expenses = [], usage = [], events = [], revenue = {} } = {}) {
   const context = createContext();
   const mocks = {
+    tenantService: { captureTenant: () => ({ wait: async operation => await operation() }) },
     expenseService: {
       getAllExpenses: async () => expenses,
       getExpensesByEvent: async id => expenses.filter(expense => expense.eventId === id)

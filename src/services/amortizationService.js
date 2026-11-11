@@ -1,3 +1,4 @@
+import { captureTenant } from './tenantService';
 import { getAllExpenses } from './expenseService';
 import { getAllUsage } from './usageService';
 
@@ -40,10 +41,11 @@ export function getUniqueExpenses(expenses) {
  * For consumable items: standard cost per unit calculation
  */
 export async function calculateAmortizedCosts() {
-  const [expenses, allUsage] = await Promise.all([
+  const tenant = captureTenant();
+  const [expenses, allUsage] = await tenant.wait(() => Promise.all([
     getAllExpenses(),
     getAllUsage()
-  ]);
+  ]));
 
   // Map to track which events each reusable item has been used in
   const reusableItemEventUsage = new Map(); // itemName -> Set of eventIds
@@ -133,7 +135,8 @@ export async function calculateAmortizedCosts() {
  * Get amortized cost for a specific item
  */
 export async function getAmortizedCostForItem(itemName) {
-  const costs = await calculateAmortizedCosts();
+  const tenant = captureTenant();
+  const costs = await tenant.wait(() => calculateAmortizedCosts());
   return costs.get(itemName);
 }
 
@@ -142,7 +145,8 @@ export async function getAmortizedCostForItem(itemName) {
  * Returns how much each item costs for that event based on amortization
  */
 export async function calculateEventAmortizedCosts(eventId, usage, existingCosts) {
-  const amortizedCosts = existingCosts || await calculateAmortizedCosts();
+  const tenant = captureTenant();
+  const amortizedCosts = existingCosts || await tenant.wait(() => calculateAmortizedCosts());
   
   const eventCosts = [];
   let totalCost = 0;

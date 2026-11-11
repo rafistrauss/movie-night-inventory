@@ -1,4 +1,7 @@
 <script>
+  import { captureTenant } from '../services/tenantService';
+  const tenant = captureTenant();
+
   import { onMount } from 'svelte';
   import { getInventoryData } from '../services/aggregationService';
   
@@ -19,18 +22,19 @@
   $: categories = [...new Set(inventory.map(item => item.category).filter(Boolean))].sort();
   $: filteredAndSortedInventory = filterAndSortInventory(inventory, searchTerm, filterType, filterCategory, sortBy, sortDirection, hideZero);
   
-  onMount(async () => {
-    await loadInventory();
+  onMount(() => {
+    void loadInventory();
   });
   
   async function loadInventory() {
     try {
       loading = true;
       // Single optimized fetch instead of 2 separate calls
-      const data = await getInventoryData();
+      const data = await tenant.wait(() => getInventoryData());
       inventory = data.inventory;
       usageHistory = data.usageHistory;
     } catch (error) {
+      if (!tenant.isActive()) return;
       console.error('Error loading inventory:', error);
     } finally {
       loading = false;

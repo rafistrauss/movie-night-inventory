@@ -1,19 +1,21 @@
+import { captureTenant } from './tenantService';
 import { getAllExpenses } from './expenseService';
 import { getAllUsage } from './usageService';
 import { dataCache } from './cacheService';
 import { calculateAmortizedCosts, getUniqueExpenses } from './amortizationService';
 
 export async function buildInventory() {
+  const tenant = captureTenant();
   const cacheKey = 'inventory';
   const cached = dataCache.get(cacheKey);
   if (cached) return cached;
 
   // Fetch all data in parallel for efficiency
-  const [expenses, allUsage, amortizedCosts] = await Promise.all([
+  const [expenses, allUsage, amortizedCosts] = await tenant.wait(() => Promise.all([
     getAllExpenses(),
     getAllUsage(),
     calculateAmortizedCosts()
-  ]);
+  ]));
   
   // Build usage map for O(1) lookups instead of O(n) queries
   const usageByItem = new Map();
@@ -95,12 +97,14 @@ export async function buildInventory() {
 }
 
 export async function getInventoryItem(itemName) {
-  const inventory = await buildInventory();
+  const tenant = captureTenant();
+  const inventory = await tenant.wait(() => buildInventory());
   return inventory.find(item => item.itemName === itemName);
 }
 
 export async function validateUsage(itemName, quantityToUse) {
-  const item = await getInventoryItem(itemName);
+  const tenant = captureTenant();
+  const item = await tenant.wait(() => getInventoryItem(itemName));
   
   if (!item) {
     return { valid: false, message: 'Item not found in inventory' };

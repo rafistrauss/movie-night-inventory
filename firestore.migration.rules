@@ -1,0 +1,17 @@
+// Temporary migration rules: replace OWNER_UID_REPLACE_ME with the verified owner
+// UID (escape it as a rules string). Deploy only during the scheduled write freeze.
+// Owner legacy reads stay available; ALL client writes are frozen.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function originalOwner() {
+      return request.auth != null && request.auth.uid == 'OWNER_UID_REPLACE_ME';
+    }
+    match /events/{document=**} { allow read: if originalOwner(); }
+    match /expenses/{document=**} { allow read: if originalOwner(); }
+    match /inventory/{document=**} { allow read: if originalOwner(); }
+    match /users/{userId}/{document=**} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

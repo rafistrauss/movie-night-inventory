@@ -1,6 +1,4 @@
 import { 
-  collection, 
-  doc, 
   addDoc, 
   updateDoc, 
   deleteDoc, 
@@ -8,17 +6,16 @@ import {
   query,
   where
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { captureTenant, tenantCollection, tenantDoc } from './tenantService';
 import { invalidateCache } from './aggregationService';
 import { dataCache } from './cacheService';
 
-export const expensesCollection = collection(db, 'expenses');
-
 export async function createExpense(expenseData) {
-  const docRef = await addDoc(expensesCollection, {
+  const tenant = captureTenant();
+  const docRef = await tenant.wait(() => addDoc(tenantCollection('expenses'), {
     ...expenseData,
     createdAt: new Date()
-  });
+  }));
   
   // Invalidate expense caches
   dataCache.invalidate('all_expenses');
@@ -30,8 +27,9 @@ export async function createExpense(expenseData) {
 }
 
 export async function updateExpense(expenseId, expenseData) {
-  const expenseRef = doc(db, 'expenses', expenseId);
-  await updateDoc(expenseRef, expenseData);
+  const tenant = captureTenant();
+  const expenseRef = tenantDoc('expenses', expenseId);
+  await tenant.wait(() => updateDoc(expenseRef, expenseData));
   
   // Invalidate expense caches
   dataCache.invalidate('all_expenses');
@@ -42,8 +40,9 @@ export async function updateExpense(expenseId, expenseData) {
 }
 
 export async function deleteExpense(expenseId) {
-  const expenseRef = doc(db, 'expenses', expenseId);
-  await deleteDoc(expenseRef);
+  const tenant = captureTenant();
+  const expenseRef = tenantDoc('expenses', expenseId);
+  await tenant.wait(() => deleteDoc(expenseRef));
   
   // Invalidate all expense caches
   dataCache.invalidate('all_expenses');
@@ -51,11 +50,12 @@ export async function deleteExpense(expenseId) {
 }
 
 export async function getAllExpenses() {
+  const tenant = captureTenant();
   const cacheKey = 'all_expenses';
   const cached = dataCache.get(cacheKey);
   if (cached) return cached;
   
-  const snapshot = await getDocs(expensesCollection);
+  const snapshot = await tenant.wait(() => getDocs(tenantCollection('expenses')));
   const expenses = snapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data()
@@ -66,12 +66,13 @@ export async function getAllExpenses() {
 }
 
 export async function getExpensesByEvent(eventId) {
+  const tenant = captureTenant();
   const cacheKey = `expenses_${eventId}`;
   const cached = dataCache.get(cacheKey);
   if (cached) return cached;
   
-  const q = query(expensesCollection, where('eventId', '==', eventId));
-  const snapshot = await getDocs(q);
+  const q = query(tenantCollection('expenses'), where('eventId', '==', eventId));
+  const snapshot = await tenant.wait(() => getDocs(q));
   const expenses = snapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data()
