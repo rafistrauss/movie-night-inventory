@@ -15,10 +15,13 @@ async function account(email) {
   return data.localId;
 }
 const uidA = await account('tenant-a@example.com');
-await account('tenant-b@example.com');
+const uidB = await account('tenant-b@example.com');
 const app = initializeApp({ projectId });
 const db = getFirestore(app);
-await db.doc(`users/${uidA}/events/secret-a`).set({ name: 'Private Alpha Movie', date: Timestamp.fromDate(new Date('2026-01-01')) });
+await db.doc('tenants/women').set({ name: "Women's movie night", memberUids: [uidA] });
+await db.doc('tenants/men').set({ name: "Men's movie night", memberUids: [uidB] });
+await db.doc(`platformAdmins/${uidA}`).set({});
+await db.doc('tenants/women/events/secret-a').set({ name: 'Private Alpha Movie', date: Timestamp.fromDate(new Date('2026-01-01')) });
 const browser = await chromium.launch({ executablePath: process.env.BROWSER_EXECUTABLE_PATH, headless: true, args: ['--no-sandbox'] });
 try {
   const page = await browser.newPage();
@@ -47,6 +50,14 @@ try {
     await page.getByRole('button', { name: 'Logout', exact: true }).waitFor();
   }
   await login('tenant-a@example.com');
+  await page.getByLabel('Movie night', { exact: true }).selectOption('women');
+  await page.getByRole('button', { name: 'Events', exact: true }).click();
+  await page.getByText('Private Alpha Movie', { exact: true }).waitFor();
+  await page.getByLabel('Movie night', { exact: true }).selectOption('men');
+  await page.getByRole('button', { name: 'Events', exact: true }).click();
+  await page.getByText('No events yet', { exact: false }).waitFor();
+  assert.equal(await page.getByText('Private Alpha Movie', { exact: true }).count(), 0);
+  await page.getByLabel('Movie night', { exact: true }).selectOption('women');
   await page.getByRole('button', { name: 'Events', exact: true }).click();
   await page.getByText('Private Alpha Movie', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Logout', exact: true }).click();
@@ -64,6 +75,10 @@ try {
   await page.getByText('No events yet', { exact: false }).waitFor();
   assert.equal(await page.evaluate(() => window.oldTenantFlashed), false);
   assert.equal(await page.getByText('Private Alpha Movie', { exact: true }).count(), 0);
+  assert.equal(await page.getByLabel('Movie night', { exact: true }).count(), 0);
+  await db.doc('tenants/men').update({ memberUids: [] });
+  await page.getByText('Your account has no movie nights assigned.', { exact: false }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Events', exact: true }).count(), 0);
   assert.deepEqual(errors, []);
-  console.log('PASS: real Chromium login A -> logout -> login B; isolated views, no stale DOM flash, no page errors.');
+  console.log('PASS: admin switches movie nights, restricted login stays isolated, live revocation clears views, no stale DOM flash or page errors.');
 } finally { await browser.close(); }

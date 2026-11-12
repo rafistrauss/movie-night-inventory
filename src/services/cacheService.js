@@ -10,12 +10,15 @@ class DataCache {
     try { globalThis.localStorage?.removeItem('movieNightCache'); } catch { /* Storage may be disabled. */ }
   }
 
-  key(key) { return `${captureTenant().uid}:${key}`; }
+  key(key) {
+    const { uid, tenantId } = captureTenant();
+    return `${uid}:${tenantId}:${key}`;
+  }
 
   set(key, value, tenant) {
     // Validate the originating generation at the write, after any await boundary.
     tenant.assertActive();
-    this.cache.set(`${tenant.uid}:${key}`, { value, timestamp: Date.now() });
+    this.cache.set(`${tenant.uid}:${tenant.tenantId}:${key}`, { value, timestamp: Date.now() });
   }
 
   get(key) {

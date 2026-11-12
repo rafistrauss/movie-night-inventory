@@ -8,13 +8,14 @@
   import ExpensesPage from './components/ExpensesPage.svelte';
   import InventoryPage from './components/InventoryPage.svelte';
   
-  import { tenantState } from './services/tenantService';
+  import { tenantState, selectTenant } from './services/tenantService';
   $: user = $tenantState.uid ? auth.currentUser : null;
   let currentView = 'dashboard';
   let selectedEventId = null;
   let email = '';
   let password = '';
   let loginError = '';
+  let previousTenantId = null;
   
   onMount(() => {
     window.addEventListener('popstate', updateViewFromUrl);
@@ -24,6 +25,10 @@
   $: if ($tenantState.generation) {
     currentView = 'dashboard';
     selectedEventId = null;
+    if (previousTenantId && previousTenantId !== $tenantState.tenantId) {
+      window.history.replaceState({}, '', '#dashboard');
+    }
+    previousTenantId = $tenantState.tenantId;
     if ($tenantState.uid) updateViewFromUrl();
   }
 
@@ -54,6 +59,11 @@
   
   async function handleLogout() {
     await signOut(auth);
+  }
+
+  function changeTenant(event) {
+    window.history.replaceState({}, '', '#dashboard');
+    selectTenant(event.target.value);
   }
   
   function navigate(view, eventId = null) {
@@ -185,6 +195,13 @@
     gap: 0.5rem;
     flex-wrap: wrap;
   }
+
+  .tenant-select {
+    padding: 0.5rem;
+    border-radius: 4px;
+    max-width: 100%;
+    font: inherit;
+  }
   
   .nav-link {
     background: none;
@@ -300,7 +317,20 @@
   {:else}
     <nav>
       <h1>🎬 Movie Night Tracker</h1>
+      {#if $tenantState.tenants.length > 1}
+        <div>
+          <label for="tenant-select">Movie night</label>
+          <select id="tenant-select" class="tenant-select" value={$tenantState.tenantId} on:change={changeTenant}>
+            {#each $tenantState.tenants as tenant}
+              <option value={tenant.id}>{tenant.name}</option>
+            {/each}
+          </select>
+        </div>
+      {:else if $tenantState.tenants.length === 1}
+        <span>{$tenantState.tenants[0].name}</span>
+      {/if}
       <div class="nav-links">
+        {#if $tenantState.tenantId}
         <button 
           class="nav-link" 
           class:active={currentView === 'dashboard'} 
@@ -329,13 +359,18 @@
         >
           Inventory
         </button>
+        {/if}
         <button class="logout-btn" on:click={handleLogout}>Logout</button>
       </div>
     </nav>
     
     {#key $tenantState.generation}
     <main>
-      {#if currentView === 'dashboard'}
+      {#if $tenantState.error}
+        <p role="alert">{$tenantState.error}</p>
+      {:else if !$tenantState.tenantId}
+        <p role="status">Your account has no movie nights assigned. Contact your administrator for access.</p>
+      {:else if currentView === 'dashboard'}
         <Dashboard on:navigate={(e) => navigate(e.detail.view, e.detail.eventId)} />
       {:else if currentView === 'events'}
         <EventsList on:navigate={(e) => navigate(e.detail.view, e.detail.eventId)} />

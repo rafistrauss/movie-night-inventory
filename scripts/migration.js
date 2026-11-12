@@ -1,13 +1,13 @@
 import { isDeepStrictEqual } from 'node:util';
 
 // Preserve SDK values (timestamps, bytes, geopoints) and remap actual references.
-export function remap(value, db, uid, roots) {
+export function remap(value, db, tenantId, roots) {
   if (value && typeof value.path === 'string' && typeof value.get === 'function') {
-    return roots.has(value.path.split('/')[0]) ? db.doc(`users/${uid}/${value.path}`) : value;
+    return roots.has(value.path.split('/')[0]) ? db.doc(`tenants/${tenantId}/${value.path}`) : value;
   }
-  if (Array.isArray(value)) return value.map(item => remap(item, db, uid, roots));
+  if (Array.isArray(value)) return value.map(item => remap(item, db, tenantId, roots));
   if (value && Object.getPrototypeOf(value) === Object.prototype) {
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, remap(item, db, uid, roots)]));
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, remap(item, db, tenantId, roots)]));
   }
   return value;
 }
@@ -28,7 +28,7 @@ function comparable(value) {
 const equal = (a, b) => isDeepStrictEqual(comparable(a), comparable(b));
 
 export async function discover(db) {
-  const roots = (await db.listCollections()).filter(ref => ref.id !== 'users');
+  const roots = (await db.listCollections()).filter(ref => !['users', 'tenants', 'platformAdmins'].includes(ref.id));
   const documents = [];
   async function visit(collection) {
     // listDocuments includes missing parents with surviving subcollections.
@@ -49,12 +49,12 @@ function references(value, found = []) {
   return found;
 }
 
-export async function migrate(db, { uid, apply = false, log = console.log }) {
-  if (typeof uid !== 'string' || !uid || uid.includes('/')) throw new Error('An explicit valid target UID is required');
+export async function migrate(db, { tenantId, apply = false, log = console.log }) {
+  if (typeof tenantId !== 'string' || !tenantId || tenantId.includes('/')) throw new Error('An explicit valid target tenant ID is required');
   const source = await discover(db);
   const sourcePaths = new Set(source.documents.map(item => item.path));
   const plan = source.documents.map(item => ({
-    ...item, target: `users/${uid}/${item.path}`, mapped: remap(item.data, db, uid, source.roots)
+    ...item, target: `tenants/${tenantId}/${item.path}`, mapped: remap(item.data, db, tenantId, source.roots)
   }));
   let existing = 0;
   // Preflight the entire plan before writing anything.
@@ -98,7 +98,7 @@ export async function migrate(db, { uid, apply = false, log = console.log }) {
     const collection = item.path.split('/').filter((_, index) => index % 2 === 0).join('/');
     counts[collection] = (counts[collection] || 0) + 1;
   }
-  const result = { uid, mode: apply ? 'applied-and-verified' : 'dry-run', total: plan.length, existing, counts };
+  const result = { tenantId, mode: apply ? 'applied-and-verified' : 'dry-run', total: plan.length, existing, counts };
   log(JSON.stringify(result, null, 2));
   return result;
 }

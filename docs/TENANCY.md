@@ -1,220 +1,127 @@
-# UID tenant isolation and production migration
+# Movie night tenants and memberships
 
-One Firebase Authentication UID is one tenant. Authentication and login remain
-unchanged. Account creation/provisioning is still through the existing Firebase
-Authentication administration flow; no tenant-selection or signup UI is added.
-A new account needs no Firestore provisioning and starts empty.
+An account can belong to multiple movie nights. Each movie night has independent
+inventory, purchases, events, attendance, usage and financial reports. Accounts
+with multiple memberships select a movie night in the navigation bar. An account
+without memberships sees an access message and can sign out.
 
-## Architecture and security
-
-All application documents now live at:
+## Firestore structure and access
 
 ```
-users/{uid}/events/{eventId}
-users/{uid}/events/{eventId}/attendees/{attendeeId}
-users/{uid}/events/{eventId}/usage/{usageId}
-users/{uid}/expenses/{expenseId}
-users/{uid}/inventory/{itemId}       # legacy optional collection, preserved
+platformAdmins/{uid}                          # global administrator grant
+tenants/{tenantId}                            # { name, memberUids: [uid, ...] }
+tenants/{tenantId}/events/{eventId}
+tenants/{tenantId}/events/{eventId}/attendees/{attendeeId}
+tenants/{tenantId}/events/{eventId}/usage/{usageId}
+tenants/{tenantId}/expenses/{expenseId}
+tenants/{tenantId}/inventory/{itemId}          # optional legacy inventory
 ```
 
-Inventory is calculated from expenses and event usage, rather than written to an
-inventory collection. Dashboard, reporting and amortization reuse those scoped
-services. Relationships currently use event IDs and item names; IDs do not change.
-There are no Firestore snapshot listeners or collection-group queries in the app.
+Membership grants read/write access to the tenant's application collections.
+A `platformAdmins/{uid}` document grants access to every current and future
+tenant. The frontend reads its own administrator document, then either lists all
+tenants or queries `memberUids` with `array-contains` for its UID. Membership and
+administrator documents cannot be written by clients, including administrators.
+Provision them with the operator script or Firebase Console. Authentication email
+alone does not confer access. Firestore rules enforce these grants on every
+request. Legacy shared collections and the earlier `/users/{uid}` layout are denied.
 
-`tenantService.js` owns path construction, authentication readiness, and reset
-notifications. It rejects unauthenticated access and path segments containing `/`.
-`TenantSession` guards every async service continuation, including nested report
-calculations. Component instances capture their login generation and guard async
-actions before starting them and after completion. Before an auth transition the
-UI is cleared, the cache is emptied, and keyed views are destroyed. Returning to
-the same UID creates a fresh generation. Pending writes already submitted to
-Firestore can still finish at their original path; they are never redirected to
-the next account. Do not retry a write blindly if its result became unknown.
+The app watches tenant memberships and administrator status. Revoking the selected
+tenant clears the current views and cache. Switching tenants or accounts destroys
+keyed component instances and invalidates outstanding asynchronous work. Cache
+keys include both UID and tenant ID. Caches are memory-only and the old shared
+localStorage cache is discarded. Already-submitted writes can complete at their
+original tenant path. Retry a write only after checking its original outcome.
 
-The cache is UID-keyed, memory-only and cleared on every auth transition. The old
-shared `movieNightCache` localStorage entry is removed, never restored. This also
-avoids corrupting Maps and Firestore timestamps through JSON serialization.
-Firestore disk persistence is not enabled by this application.
+## Provision accounts and tenants
 
-The final rules allow an authenticated UID only inside its own `/users/{uid}`
-subtree, including future nested collections. Other user subtrees, legacy roots
-and unauthenticated requests are denied. There is no public application data.
-The UID path is the security boundary; frontend filtering is not relied upon.
-Admin SDK bypasses rules and is used only by operator scripts and tests.
-
-## Local validation
-
-Use Node 22+ and Java 21 for Firebase tooling. No credentials are needed for the
-demo Firestore Emulator project. Run:
+Create email/password accounts in Firebase Authentication. Use Node 22+ with
+operator Application Default Credentials, or add `--firebase-login` to use an
+existing local Firebase CLI login. Credentials are kept outside the frontend.
 
 ```sh
-npm ci
+node scripts/provision-tenant.js --project PROJECT_ID --tenant women --name "Women's movie night" --member WOMENS_ACCOUNT_EMAIL --admin ADMIN_EMAIL --dry-run
+node scripts/provision-tenant.js --project PROJECT_ID --tenant women --name "Women's movie night" --member WOMENS_ACCOUNT_EMAIL --admin ADMIN_EMAIL --apply
+node scripts/provision-tenant.js --project PROJECT_ID --tenant men --name "Men's movie night" --dry-run
+node scripts/provision-tenant.js --project PROJECT_ID --tenant men --name "Men's movie night" --apply
+```
+
+After creating the men's account, run the same command for `men` with
+`--member MENS_ACCOUNT_EMAIL`. Repeat `--member` for more than one account.
+Provisioning adds memberships without removing existing members, and validates
+all email addresses against Firebase Authentication before committing the batch.
+To revoke access, remove the UID from the tenant's `memberUids` array in Firebase
+Console. To revoke global access, delete the administrator grant document.
+
+## Migration and release
+
+The current shared records belong to Women's movie night. Men's movie night starts
+empty. The administrator receives global access and the existing restricted
+account receives membership only in Women's movie night. The new men's account
+can be provisioned once created.
+
+1. Record the deployed application revision and Firestore rules release/source.
+   Pause privileged writers and choose a maintenance window for client edits.
+2. Prepare a backup destination compatible with the database location. Substitute
+   the verified legacy owner UID in a local copy of `firestore.migration.rules`.
+   Those rules preserve owner-only legacy reads and tenant membership reads while
+   denying all client writes. Deploy using `firebase.migration.json`, then back
+   up the frozen dataset and rules. Verify the backup is readable and recoverable.
+3. Provision tenant metadata, membership and administrator grants using the
+   operator script. Run the migration dry-run and review paths and counts.
+
+   ```sh
+   node scripts/migrate-tenant.js --project PROJECT_ID --tenant women --dry-run
+   node scripts/migrate-tenant.js --project PROJECT_ID --tenant women --apply
+   node scripts/migrate-tenant.js --project PROJECT_ID --tenant women --apply
+   ```
+
+   Require `applied-and-verified` and the expected counts. The second apply must
+   report `existing == total`. Compare inventory quantities, events, payments and
+   financial totals with the legacy dataset before release.
+4. Run the validation commands below. Deploy final `firestore.rules` first, then
+   publish the tested application revision using the manual GitHub Pages workflow.
+   Ask users to reload after the deployment. Verify the administrator can switch
+   tenants, restricted accounts see only their memberships, and both legacy and
+   unauthorized tenant requests fail.
+5. Resume privileged writers only after updating their paths. Retain locked legacy
+   records and backups for recovery. Deleting legacy records is a separate action.
+
+Migration discovers all root collections except reserved `tenants`,
+`platformAdmins` and `users`. Review unexpected roots before applying. It preserves
+IDs, nested and orphan subcollections, timestamps and SDK field types. Actual
+DocumentReference values into legacy roots are remapped to the target tenant.
+ID/name string relationships remain unchanged. The operator CLI requires an
+existing destination tenant. The migration library preflights every destination,
+rejects conflicts and dangling event links, and copies only absent documents in
+transactions that recheck source and destination. A final pass compares every
+copied document and verifies unchanged sources. Rerunning an interrupted migration
+is safe while sources remain frozen and targets match. It never deletes sources.
+Once tenant edits begin, do not rerun as ongoing synchronization.
+
+If verification fails, keep writes frozen and investigate against the backup.
+After cutover, freeze writes again before recovery. Tenant edits made after cutover
+need reconciliation before any old-app rollback. Restoring permissive legacy
+rules would reopen cross-account access.
+
+## Validation
+
+```sh
 npm test
 npm run test:emulator
 npm run lint
 npm run build
 ```
 
-For the optional Chromium UI smoke test (two local emulator accounts), start
-`npm run dev -- --host 127.0.0.1` in another terminal, then run:
+The emulator runs with a demo project and never needs production credentials.
+Use Java 21+ for current Firebase tooling. For a real Chromium smoke test, start
+`npm run dev -- --host 127.0.0.1`, then run `npm run test:browser`. The browser test
+connects to local Auth/Firestore emulators, blocks production service requests,
+and exercises administrator switching, restricted login and live revocation.
+Set `BROWSER_EXECUTABLE_PATH` to an installed Chromium browser if needed.
 
-```sh
-npx playwright install chromium
-npm run test:browser
-```
-
-Alternatively set `BROWSER_EXECUTABLE_PATH` to an existing Chromium executable.
-The test intercepts only the dev Firebase module to connect to local emulators,
-blocks production Firebase requests, and checks logout/account switching for
-transient private DOM data. It does not edit production configuration.
-
-The project is JavaScript and has no configured TypeScript type-check command.
-Svelte checking was additionally run with `svelte-check` (zero errors).
-The Svelte/Vite build validates compilation. Existing oxlint Svelte unused-variable,
-accessibility, and bundle-size warnings are separate from tenant isolation.
-PR CI runs the unit tests, emulator tests, lint and build. Tests cover own/foreign/
-anonymous access, denied legacy access, real-service CRUD/bulk writes, inventory,
-financials, stale account requests and caches, plus migration preservation,
-references, dry-run, retries and conflicts. The service integration test uses an
-emulator administrative test context to switch simulated auth identities; rules
-are independently tested with real authenticated emulator contexts.
-
-## Migration behavior
-
-`npm run migrate:tenant -- --project PROJECT_ID --uid OWNER_UID --dry-run`
-recursively inventories **all root collections except `users`**, including missing
-parent documents with surviving subcollections. Review every COPY/KEEP line and
-the per-collection counts. Unexpected roots must be reviewed before applying;
-the script intentionally includes discovered legacy data instead of losing it.
-The script validates that the explicitly supplied UID exists in Firebase Auth.
-It cannot determine the historical owner from shared records: confirm this UID
-with the original operator in Firebase Console > Authentication. Do not assign
-shared production data to the currently logged-in account by assumption.
-
-`--dry-run` is mandatory unless `--apply` is explicitly supplied. The script never
-deletes source records. IDs, nested paths, field timestamps and SDK values are
-preserved; actual Firestore DocumentReference values pointing to legacy roots
-are remapped under the owner. ID/name string relationships are unchanged. Firestore
-system create/update metadata on the newly created copies is naturally new.
-Dangling eventId fields or actual legacy document references stop preflight;
-missing parent documents alone do not prevent preserving their subcollections.
-
-All destination conflicts are preflighted before writing. Identical documents
-are skipped; different data is an error, never overwritten. Each copy then uses
-an Admin transaction to recheck its source and destination and create only when
-absent. Finally all source paths/data and every destination are reread and
-compared; the source count and collection counts are reported. A mid-run error
-can leave a partial destination copy: fix the cause, keep writes frozen and
-rerun. Retrying identical source data is idempotent. No blind merge is performed.
-After tenant writes resume, rerunning can correctly report conflicts: it is a
-one-time migration, not ongoing synchronization.
-
-Discovery holds the plan in memory and reads documents individually, trading
-speed for reviewability and conflict safety. Budget reads/writes and maintenance
-time for the actual dataset. There is no cross-dataset atomic snapshot: the
-client write freeze and a pause of all privileged writers are required.
-
-## Coordinated rollout (operator actions, never automatic)
-
-Deployment is now **manual** (`workflow_dispatch`), because the old workflow
-published every merge to master before migration could be verified. Merging
-this branch does not deploy the app. Firebase rules are also deployed separately.
-Do not release this UI against the old shared-data rules.
-
-1. Schedule maintenance and pause all Admin jobs, imports and other privileged
-   writers. Record the current master commit, deployed Pages artifact, Firebase
-   rules release, and existing rules source. Keep these in the change record.
-   Validate in a separate staging Firebase project before production rollout.
-2. Identify and verify the original owner's UID. Prepare a Firestore export
-   bucket with the documented Firestore service-agent IAM permissions and
-   compatible location. Use operator ADC outside the frontend (e.g.
-   `gcloud auth application-default login`). Never commit service-account keys.
-3. Replace `OWNER_UID_REPLACE_ME` in `firestore.migration.rules` with the verified
-   owner UID, correctly escaped as a Firestore rules string. Review the diff.
-   This temporary ruleset preserves the owner's legacy reads while freezing
-   **all client writes**, including tenant writes. Its explicit legacy roots
-   match the actual repository; if discovery finds additional roots, add
-   equivalent owner-only read matches after reviewing them. Existing source
-   records remain readable before migration finishes. Keep users informed that
-   edits are paused. Deploy the freeze, then back up the frozen dataset:
-
-   ```sh
-   export PROJECT_ID='your-firebase-project-id'
-   export OWNER_UID='the-verified-original-owner-uid'
-   export BACKUP_URI='gs://your-firestore-backups/pre-tenancy-YYYYMMDD-HHMM'
-   npx firebase deploy --only firestore:rules --project "$PROJECT_ID" --config firebase.migration.json
-   gcloud firestore export "$BACKUP_URI" --project "$PROJECT_ID"
-   gcloud firestore operations list --project "$PROJECT_ID"
-   ```
-
-   Confirm export completion, record its full output URI, and test restoration
-   into a separate project. Also save an independent offsite copy of the rules.
-4. With writes still frozen, review a dry-run and then apply:
-
-   ```sh
-   npm run migrate:tenant -- --project "$PROJECT_ID" --uid "$OWNER_UID" --dry-run
-   npm run migrate:tenant -- --project "$PROJECT_ID" --uid "$OWNER_UID" --apply
-   npm run migrate:tenant -- --project "$PROJECT_ID" --uid "$OWNER_UID" --apply
-   ```
-
-   Save output in the change record. Require `applied-and-verified`, expected
-   counts, and a second run with `existing == total`. Check owner event names,
-   attendee payments, inventory quantities, and financial totals against the
-   legacy UI. Do not proceed on conflicts, changed sources or dangling references.
-5. After verification and explicit release approval, merge/review the release
-   commit through normal repository procedures. During maintenance deploy final
-   rules first, then publish that exact application revision:
-
-   ```sh
-   npm test
-   npm run test:emulator
-   npm run lint
-   npm run build
-   npx firebase deploy --only firestore:rules --project "$PROJECT_ID" --config firebase.json
-   gh workflow run deploy.yml --repo rafistrauss/movie-night-inventory --ref master
-   gh run list --repo rafistrauss/movie-night-inventory --workflow deploy.yml --limit 3
-   ```
-
-   Final rules deny all legacy root access. Old tabs may receive denied requests
-   between rules publication and refreshing the new app; ask users to reload.
-   Do not reopen root access to make old clients work. Wait for Pages deployment
-   completion and verify the loaded version before ending maintenance.
-6. Smoke-test two independent Firebase accounts: original owner sees migrated
-   data; a new account starts empty; each creates/edits inventory purchases,
-   events, attendance and usage and sees isolated dashboards/financials. Logout,
-   switch accounts in the same browser and reload. Confirm no old records flash
-   and direct cross-UID/legacy requests fail. Re-enable privileged jobs only
-   after updating their paths. Keep legacy data locked and retained for the
-   agreed backup retention period; deletion is a separate approved operation.
-
-The migration/template, export and deploy commands above are operator procedures;
-none are run by tests or automatically during build/deployment. Do not commit the
-production owner UID substituted into the migration template.
-
-## Rollback
-
-Before cutover, leave the legacy source untouched: stop on any verification error
-and keep the freeze rules in place while investigating. No deletion is needed to
-retry. Do not overwrite conflicts; compare them to the export and obtain an
-explicit repair decision.
-
-After cutover, first restore the freeze rules to stop new client writes (and
-pause privileged writers), and back up both datasets. Prefer rolling back to a
-previous **tenant-compatible** app artifact while keeping final tenant rules.
-Rolling back to the old root-based app after new tenant writes would hide newer
-data. Reconcile tenant-only changes into a reviewed copy of the old dataset or
-restore/test an export in a separate project before any old-app rollback.
-
-A tested export can be restored to a separate recovery project with:
-
-```sh
-gcloud firestore import "$BACKUP_URI" --project "$RECOVERY_PROJECT_ID"
-```
-
-An import can overwrite matching records; never import over live production as
-an automatic rollback. If an old-app rollback is necessary, serve maintenance
-until reconciliation is complete, manually deploy owner-only legacy read/write
-rules (never the former any-authenticated-user rules), then restore the recorded
-Pages artifact. Keep new user tenants inaccessible to the old app and retained
-for later recovery. Record all changes and verify financial totals again.
+Unit tests exercise financial calculations and stale session/cache protection.
+Emulator tests exercise shared memberships, foreign/anonymous denial, future
+tenant access for global admins, denied access escalation, revocation, real service
+CRUD and migration conflict/retry/type preservation. Existing Svelte accessibility,
+unused-variable and bundle-size warnings are unrelated to tenant permissions.

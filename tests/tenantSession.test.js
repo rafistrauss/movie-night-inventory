@@ -39,3 +39,18 @@ test('a stale view cannot start a mutation in the next account', async () => {
   assert.equal(writes, 0);
   assert.equal(view.isActive(), false);
 });
+
+test('a tenant switch invalidates an outstanding operation without changing the user', async () => {
+  const session = new TenantSession();
+  session.activate('admin', 'women');
+  const first = session.capture();
+  let finish;
+  const pending = first.wait(() => new Promise(resolve => { finish = resolve; }));
+  session.activate('admin', 'men');
+  finish('women data');
+  await assert.rejects(pending, /session changed/);
+  assert.equal(session.capture().tenantId, 'men');
+  assert.equal(session.capture().uid, 'admin');
+  session.activate('admin', null);
+  assert.throws(() => session.capture(), /Authentication/);
+});

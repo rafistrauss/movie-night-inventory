@@ -11,7 +11,15 @@ async function loadSessionAndCache() {
       beforeAuthStateChanged: (_, callback) => { beforeAuth = callback; },
       onAuthStateChanged: (_, callback) => { authChanged = callback; }
     },
-    'firebase/firestore': { collection() {}, doc() {} },
+    'firebase/firestore': {
+      collection: (...parts) => ({ parts }), doc: (...parts) => ({ parts }),
+      query: ref => ref, where() {},
+      onSnapshot(ref, callback) {
+        if (ref.parts[1] === 'platformAdmins') callback({ exists: () => false });
+        else callback({ docs: [auth.currentUser.uid, 'shared'].map(id => ({ id, data: () => ({ name: id }) })) });
+        return () => {};
+      }
+    },
     'svelte/store': { writable: initial => {
       state = initial;
       return { set(value) { state = value; } };
@@ -85,4 +93,20 @@ test('a transition after wait validation cannot write old records into the new a
   assert.equal(app.cache.get('events'), null);
   app.cache.set('events', ['B'], app.tenant.captureTenant());
   assert.equal(app.cache.get('events')[0], 'B');
+});
+
+test('switching movie nights clears caches and invalidates pending work within the same account', async () => {
+  const app = await loadSessionAndCache();
+  app.signIn('a');
+  const first = app.tenant.captureTenant();
+  app.cache.set('events', ['Private A'], first);
+  app.tenant.selectTenant('shared');
+  assert.equal(app.state.uid, 'a');
+  assert.equal(app.state.tenantId, 'shared');
+  assert.equal(app.cache.get('events'), null);
+  assert.throws(() => app.cache.set('events', ['stale'], first), /session changed/);
+  assert.throws(() => app.tenant.selectTenant('forbidden'), /unavailable/);
+  app.cache.set('events', ['Shared'], app.tenant.captureTenant());
+  app.tenant.selectTenant('a');
+  assert.equal(app.cache.get('events'), null);
 });
