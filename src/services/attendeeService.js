@@ -1,5 +1,4 @@
 import { 
-  collection, 
   doc, 
   addDoc, 
   updateDoc, 
@@ -8,15 +7,17 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { captureTenant, tenantCollection, tenantDoc } from './tenantService';
 import { invalidateCache } from './aggregationService';
 import { dataCache } from './cacheService';
 
 export async function addAttendee(eventId, attendeeData) {
-  const attendeesRef = collection(db, 'events', eventId, 'attendees');
-  const docRef = await addDoc(attendeesRef, {
+  const tenant = captureTenant();
+  const attendeesRef = tenantCollection('events', eventId, 'attendees');
+  const docRef = await tenant.wait(() => addDoc(attendeesRef, {
     ...attendeeData,
     checkedIn: attendeeData.checkedIn || false
-  });
+  }));
   
   // Invalidate attendees cache for this event
   dataCache.invalidate(`attendees_${eventId}`);
@@ -31,12 +32,13 @@ export async function addAttendee(eventId, attendeeData) {
  * @returns {Promise<Array>} Array of created attendee IDs
  */
 export async function bulkAddAttendees(eventId, attendeesData) {
+  const tenant = captureTenant();
   if (!Array.isArray(attendeesData) || attendeesData.length === 0) {
     return [];
   }
 
   const batch = writeBatch(db);
-  const attendeesRef = collection(db, 'events', eventId, 'attendees');
+  const attendeesRef = tenantCollection('events', eventId, 'attendees');
   const newDocRefs = [];
 
   for (const attendeeData of attendeesData) {
@@ -48,7 +50,7 @@ export async function bulkAddAttendees(eventId, attendeesData) {
     newDocRefs.push(newDocRef);
   }
 
-  await batch.commit();
+  await tenant.wait(() => batch.commit());
   
   // Invalidate attendees cache for this event
   dataCache.invalidate(`attendees_${eventId}`);
@@ -58,8 +60,9 @@ export async function bulkAddAttendees(eventId, attendeesData) {
 }
 
 export async function updateAttendee(eventId, attendeeId, attendeeData) {
-  const attendeeRef = doc(db, 'events', eventId, 'attendees', attendeeId);
-  await updateDoc(attendeeRef, attendeeData);
+  const tenant = captureTenant();
+  const attendeeRef = tenantDoc('events', eventId, 'attendees', attendeeId);
+  await tenant.wait(() => updateDoc(attendeeRef, attendeeData));
   
   // Invalidate attendees cache for this event
   dataCache.invalidate(`attendees_${eventId}`);
@@ -67,8 +70,9 @@ export async function updateAttendee(eventId, attendeeId, attendeeData) {
 }
 
 export async function deleteAttendee(eventId, attendeeId) {
-  const attendeeRef = doc(db, 'events', eventId, 'attendees', attendeeId);
-  await deleteDoc(attendeeRef);
+  const tenant = captureTenant();
+  const attendeeRef = tenantDoc('events', eventId, 'attendees', attendeeId);
+  await tenant.wait(() => deleteDoc(attendeeRef));
   
   // Invalidate attendees cache for this event
   dataCache.invalidate(`attendees_${eventId}`);
@@ -76,22 +80,24 @@ export async function deleteAttendee(eventId, attendeeId) {
 }
 
 export async function getAttendees(eventId) {
+  const tenant = captureTenant();
   const cacheKey = `attendees_${eventId}`;
   const cached = dataCache.get(cacheKey);
   if (cached) return cached;
   
-  const attendeesRef = collection(db, 'events', eventId, 'attendees');
-  const snapshot = await getDocs(attendeesRef);
+  const attendeesRef = tenantCollection('events', eventId, 'attendees');
+  const snapshot = await tenant.wait(() => getDocs(attendeesRef));
   const attendees = snapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data()
   }));
   
-  dataCache.set(cacheKey, attendees);
+  dataCache.set(cacheKey, attendees, tenant);
   return attendees;
 }
 
 export async function getTotalCollected(eventId) {
-  const attendees = await getAttendees(eventId);
+  const tenant = captureTenant();
+  const attendees = await tenant.wait(() => getAttendees(eventId));
   return attendees.reduce((sum, attendee) => sum + (attendee.paidAmount || 0), 0);
 }

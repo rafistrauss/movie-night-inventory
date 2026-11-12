@@ -1,3 +1,4 @@
+import { captureTenant } from './tenantService';
 import { getTotalCollected } from './attendeeService';
 import { getUsageByEvent } from './usageService';
 import { getAllExpenses } from './expenseService';
@@ -5,19 +6,21 @@ import { dataCache } from './cacheService';
 import { calculateEventAmortizedCosts, getUniqueExpenses } from './amortizationService';
 
 export async function calculateEventCost(eventId) {
-  const usage = await getUsageByEvent(eventId);
+  const tenant = captureTenant();
+  const usage = await tenant.wait(() => getUsageByEvent(eventId));
   
   // Calculate amortized costs (includes reusable item amortization)
-  const amortizedCosts = await calculateEventAmortizedCosts(eventId, usage);
+  const amortizedCosts = await tenant.wait(() => calculateEventAmortizedCosts(eventId, usage));
   
   return amortizedCosts.totalCost;
 }
 
 export async function calculateEventProfit(eventId) {
-  const [totalCollected, totalCost] = await Promise.all([
+  const tenant = captureTenant();
+  const [totalCollected, totalCost] = await tenant.wait(() => Promise.all([
     getTotalCollected(eventId),
     calculateEventCost(eventId)
-  ]);
+  ]));
   
   return {
     revenue: totalCollected,
@@ -27,29 +30,31 @@ export async function calculateEventProfit(eventId) {
 }
 
 export async function calculateGlobalLeftoverFunds() {
+  const tenant = captureTenant();
   const cacheKey = 'global_leftover_funds';
   const cached = dataCache.get(cacheKey);
   if (cached !== null) return cached;
   
   // Use aggregation service for optimized calculation
-  const { aggregateAllData } = await import('./aggregationService');
-  const data = await aggregateAllData();
+  const { aggregateAllData } = await tenant.wait(() => import('./aggregationService'));
+  const data = await tenant.wait(() => aggregateAllData());
   
-  dataCache.set(cacheKey, data.globalLeftoverFunds);
+  dataCache.set(cacheKey, data.globalLeftoverFunds, tenant);
   return data.globalLeftoverFunds;
 }
 
 export async function getEventFinancialSummary(eventId) {
-  const [totalCollected, usage, allExpenses] = await Promise.all([
+  const tenant = captureTenant();
+  const [totalCollected, usage, allExpenses] = await tenant.wait(() => Promise.all([
     getTotalCollected(eventId),
     getUsageByEvent(eventId),
     getAllExpenses()
-  ]);
+  ]));
   // Repeated entries of a reusable item only count as a purchase once
   const expenses = getUniqueExpenses(allExpenses).filter(expense => expense.eventId === eventId);
   
   // Get amortized cost calculations
-  const amortizedCosts = await calculateEventAmortizedCosts(eventId, usage);
+  const amortizedCosts = await tenant.wait(() => calculateEventAmortizedCosts(eventId, usage));
   
   // Build unified breakdown combining purchases and usage
   const itemsMap = new Map();

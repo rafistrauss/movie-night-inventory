@@ -1,4 +1,7 @@
 <script>
+  import { captureTenant } from '../services/tenantService';
+  const tenant = captureTenant();
+
   import { onMount } from 'svelte';
   import { createEventDispatcher } from 'svelte';
   import { getAllEvents, createEvent, deleteEvent } from '../services/eventService';
@@ -16,15 +19,16 @@
     notes: ''
   };
   
-  onMount(async () => {
-    await loadEvents();
+  onMount(() => {
+    void loadEvents();
   });
   
   async function loadEvents() {
     try {
       loading = true;
-      events = await getAllEvents();
+      events = await tenant.wait(() => getAllEvents());
     } catch (error) {
+      if (!tenant.isActive()) return;
       console.error('Error loading events:', error);
     } finally {
       loading = false;
@@ -33,11 +37,12 @@
   
   async function handleCreateEvent() {
     try {
-      await createEvent(newEvent);
+      await tenant.wait(() => createEvent(newEvent));
       newEvent = { name: '', date: '', ticketPrice: 0, notes: '' };
       showCreateForm = false;
-      await loadEvents();
+      await tenant.wait(() => loadEvents());
     } catch (error) {
+      if (!tenant.isActive()) return;
       console.error('Error creating event:', error);
       alert('Error creating event: ' + error.message);
     }
@@ -46,9 +51,10 @@
   async function handleDeleteEvent(eventId) {
     if (confirm('Are you sure you want to delete this event?')) {
       try {
-        await deleteEvent(eventId);
-        await loadEvents();
+        await tenant.wait(() => deleteEvent(eventId));
+        await tenant.wait(() => loadEvents());
       } catch (error) {
+        if (!tenant.isActive()) return;
         console.error('Error deleting event:', error);
         alert('Error deleting event: ' + error.message);
       }
